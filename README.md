@@ -40,8 +40,6 @@ O sistema adota o padrão de microsserviços (*Database per service*), orquestra
 | **3. Remediação (Task)** | Gera e gerencia o ciclo de vida do plano de ação (to-do list). | PostgreSQL |
 | **4. Certificação (Badge)** | Emite o selo público de conformidade (CQRS para o Portal Público). | Redis / PostgreSQL |
 
-*A arquitetura completa, endpoints da API e fluxos de compensação (SAGA) estarão documentados na pasta `/docs` a partir da Parte 2.*
-
 ---
 
 ## 📚 Fundamentação e Referências Técnicas

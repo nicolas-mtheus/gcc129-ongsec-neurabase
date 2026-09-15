@@ -10,7 +10,7 @@ Projeto prático desenvolvido para a disciplina **GCC129 — Sistemas Distribuí
 * **Nicolas Matheus Lima Oliveira** — GitHub: [@nicolas-mtheus](https://github.com/nicolas-mtheus)
 * **Marco Antônio Maia** — GitHub: [@usuario-marco](#)
 * **Tainara de Fátima Matias Souza** — GitHub: [@usuario-tainara](#)
-* **Lucas de Jesus Gonçalves** — GitHub: [@usuario-lucas](#)
+* **Lucas de Jesus Gonçalves** — GitHub: [@lucasjesus682](https://github.com/lucasjesus682)
 
 ---
 

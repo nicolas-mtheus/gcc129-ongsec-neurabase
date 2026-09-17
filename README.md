@@ -1,27 +1,53 @@
-# ONGSec 🛡️
-**Startup de Cibersegurança e Conformidade LGPD para o Terceiro Setor e Pequenos Negócios**
+<p align="center">
+  <img src="docs/img/logo-neura.png" alt="ONGSec Banner" width="100%" />
+</p>
 
-Projeto prático desenvolvido para a disciplina **GCC129 — Sistemas Distribuídos** (2026/2)  
-**Instituição:** Universidade Federal de Lavras (UFLA)
+<p align="center">
+  <img src="https://img.shields.io/badge/Status-Em%20Desenvolvimento-blue?style=for-the-badge" alt="Status">
+  <img src="https://img.shields.io/badge/UFLA-GCC129%20Sistemas%20Distribu%C3%ADdos-red?style=for-the-badge" alt="UFLA">
+  <img src="https://img.shields.io/badge/LGPD-Conformidade-success?style=for-the-badge" alt="LGPD">
+</p>
+
+<h3 align="center">
+  Startup de Cibersegurança e Conformidade LGPD para o Terceiro Setor e Pequenos Negócios
+</h3>
 
 ---
 
-## 👥 Integrantes (Equipe NeuraBase)
-* **Nicolas Matheus Lima Oliveira** — GitHub: [@nicolas-mtheus](https://github.com/nicolas-mtheus)
-* **Marco Antônio Maia** — GitHub: [@usuario-marco](#)
-* **Tainara de Fátima Matias Souza** — GitHub: [@usuario-tainara](#)
-* **Lucas de Jesus Gonçalves** — GitHub: [@usuario-lucas](#)
+## Integrantes (Equipe NeuraBase)
+
+<p align="center">
+  <a href="https://github.com/lucasjesus682">
+    <img src="https://github.com/lucasjesus682.png" width="70" style="border-radius: 50%;" alt="Lucas"/>
+  </a>
+  &nbsp;&nbsp;&nbsp;&nbsp;
+  <a href="https://github.com/marco2299">
+    <img src="https://github.com/marco2299.png" width="70" style="border-radius: 50%;" alt="Marco"/>
+  </a>
+  &nbsp;&nbsp;&nbsp;&nbsp;
+  <a href="https://github.com/nicolas-mtheus">
+    <img src="https://github.com/nicolas-mtheus.png" width="70" style="border-radius: 50%;" alt="Nicolas"/>
+  </a>
+  &nbsp;&nbsp;&nbsp;&nbsp;
+  <a href="https://github.com/tainarafms">
+    <img src="https://github.com/tainarafms.png" width="70" style="border-radius: 50%;" alt="Tainara"/>
+  </a>
+</p>
+
+<p align="center">
+  <b>Lucas J.</b> | <b>Marco A.</b> | <b>Nicolas M.</b> | <b>Tainara F.</b>
+</p>
 
 ---
 
-## 🎯 O Problema e Motivação
+## O Problema e Motivação
 Comércios locais e associações sem fins lucrativos (ONGs) lidam diariamente com dados altamente sensíveis — desde registros de doadores e fichas médicas até endereços de populações em extrema vulnerabilidade social. No entanto, por restrições orçamentárias e falta de equipes técnicas, essas entidades recorrem a processos inseguros (troca de documentos via aplicativos de mensagem sem criptografia, planilhas compartilhadas sem controle de acesso ou senhas padrão). 
 
 Com a vigência da **Lei Geral de Proteção de Dados (LGPD - Lei nº 13.709/2018)** e o avanço das sanções operacionais pela ANPD, a ausência de higiene cibernética expõe essas instituições a riscos severos de vazamento de dados, perda de credibilidade e inviabilização de suas atividades.
 
 ---
 
-## 🌱 Impacto Social Esperado
+## Impacto Social Esperado
 Democratizar o acesso à segurança da informação e à conformidade regulatória no Terceiro Setor por meio de uma plataforma automatizada, didática e de baixo custo.
 
 * **Beneficiários:** Gestores de ONGs, pequenos comerciantes, doadores e assistidos por projetos sociais.
@@ -30,7 +56,7 @@ Democratizar o acesso à segurança da informação e à conformidade regulatór
 
 ---
 
-## 💡 A Solução e História de Uso
+## A Solução e História de Uso
 O **ONGSec** atua como um consultor de segurança automatizado e emissor de selos digitais de conformidade cibernética.
 
 **Exemplo Prático (Associação Cuidar):**
@@ -42,17 +68,18 @@ O **ONGSec** atua como um consultor de segurança automatizado e emissor de selo
 
 ---
 
-## 🏗️ Esboço da Arquitetura Distribuída
+## Esboço da Arquitetura Distribuída
 
-O sistema utiliza o padrão de **Microsserviços com Persistência Poliglota e *Database per Service*** (cada serviço possui sua própria instância isolada de banco de dados no Docker).
+O sistema utiliza o padrão de **Microsserviços com Persistência Poliglota e Database per Service** (cada serviço possui sua própria instância isolada de banco de dados no Docker).
 
-
-```
-
-[ Cliente Web: Gestão ] ---> [ BFF 1: Gestão ] --+
-|---> [ API Gateway ] ---> [ Microsserviços ]
-[ Cliente Web: Público ] --> [ BFF 2: Público ] --+
-
+```text
+       ┌────────────────────────┐         ┌──────────────────┐
+       │  Cliente Web (Gestão)  │ ─────>  │  BFF 1: Gestão   │
+       └────────────────────────┘         └────────┬─────────┘
+                                                   │
+       ┌────────────────────────┐         ┌────────▼─────────┐
+       │ Cliente Web (Público)  │ ─────>  │  BFF 2: Público  │  ───> [ API Gateway ] ──> [ Microsserviços ]
+       └────────────────────────┘         └──────────────────┘
 ```
 
 | Microsserviço de Domínio | Responsabilidade Principal | Tecnologia de Banco de Dados | Justificativa Arquitetural |
@@ -69,7 +96,7 @@ O sistema utiliza o padrão de **Microsserviços com Persistência Poliglota e *
 
 ---
 
-## 📚 Fundamentação e Referências Sólidas
+## Fundamentação e Referências Sólidas
 
 1. **ANPD (Autoridade Nacional de Proteção de Dados):** *Guia Orientativo para Agentes de Tratamento de Pequeno Porte.* Brasília: ANPD, 2021.
 2. **CERT.br (Centro de Estudos, Resposta e Tratamento de Incidentes de Segurança no Brasil):** *Cartilha de Segurança para a Internet.* São Paulo: NIC.br, 2023.
@@ -78,7 +105,7 @@ O sistema utiliza o padrão de **Microsserviços com Persistência Poliglota e *
 
 ---
 
-## 🚀 Instruções para Execução Local
+## Instruções para Execução Local
 
 > **Nota:** Ambiente inicial de desenvolvimento. A orquestração completa em containers Docker e Kubernetes será disponibilizada nas etapas 3 e 4.
 
@@ -96,5 +123,3 @@ cd gcc129-ongsec-neurabase
 
 # 3. Subir os serviços e bancos de dados isolados (Em desenvolvimento)
 docker-compose up -d
-
-```

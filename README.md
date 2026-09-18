@@ -60,13 +60,13 @@ O sistema utiliza o padrão de **Microsserviços com Database per Service** (cad
 
 ```text
        ┌────────────────────────┐         ┌──────────────────┐
-       │  Cliente Web (Gestão)  │ ─────>  │  BFF 1: Gestão   │
+       │  Cliente Web (Gestão)      │ ─────>  │  BFF 1: Gestão      │
        └────────────────────────┘         └────────┬─────────┘
-                                                   │
+                                                         │
        ┌────────────────────────┐         ┌────────▼─────────┐
-       │ Cliente Web (Público)  │ ─────>  │  BFF 2: Público  │  ───> [ API Gateway ] ──> [ Microsserviços ]
+       │ Cliente Web (Público)      │ ─────>  │  BFF 2: Público     │  ───> [ API Gateway ] ──> [ Microsserviços ]
        └────────────────────────┘         └──────────────────┘
-
+```
 | Microsserviço de Domínio | Responsabilidade Principal | Tecnologia de Banco de Dados | Justificativa Arquitetural |
 |---|---|---|---|
 | 1. Entidades (org-service) | Gestão de cadastros de ONGs, usuários, perfis e autenticação. | PostgreSQL (Instância 1) | Garantia ACID para dados estruturados de contas e acessos. |

@@ -1,0 +1,418 @@
+openapi: 3.0.3
+info:
+  title: ONGSec org-service
+  version: 1.0.0
+  description: >
+    Cadastro de organizações, usuários e sessões. É a fonte do nome da
+    instituição e do responsável legal usados pelo BFF Gestão. Emite o JWT
+    que o API Gateway valida nas rotas `/api/gestao/*`.
+servers:
+  - url: http://org-service:8080
+    description: Rede interna. Não é publicado no API Gateway.
+tags:
+  - name: organizacoes
+  - name: usuarios
+  - name: sessoes
+paths:
+  /v1/organizacoes:
+    post:
+      tags: [organizacoes]
+      operationId: criarOrganizacao
+      summary: Cadastra uma organização
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NovaOrganizacao'
+            example:
+              nome_instituicao: Associação Cuidar
+              cnpj: "12345678000199"
+              responsavel_legal: Maria da Silva
+              email: maria@associacaocuidar.org
+      responses:
+        '201':
+          description: Organização criada.
+          headers:
+            Location:
+              schema:
+                type: string
+              example: /v1/organizacoes/ong-123
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Organizacao'
+              example:
+                ong_id: ong-123
+                nome_instituicao: Associação Cuidar
+                cnpj: "12345678000199"
+                responsavel_legal: Maria da Silva
+                email: maria@associacaocuidar.org
+                criada_em: "2026-10-01T12:00:00Z"
+        '400':
+          $ref: '#/components/responses/RequisicaoInvalida'
+        '409':
+          $ref: '#/components/responses/Conflito'
+    get:
+      tags: [organizacoes]
+      operationId: listarOrganizacoes
+      summary: Lista organizações visíveis ao usuário autenticado
+      parameters:
+        - $ref: '#/components/parameters/Limite'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Lista de organizações.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListaOrganizacoes'
+        '400':
+          $ref: '#/components/responses/RequisicaoInvalida'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+  /v1/organizacoes/{ongId}:
+    parameters:
+      - $ref: '#/components/parameters/OngId'
+      - $ref: '#/components/parameters/CorrelationId'
+    get:
+      tags: [organizacoes]
+      operationId: obterOrganizacao
+      summary: Obtém o cadastro usado na composição do BFF Gestão
+      responses:
+        '200':
+          description: Cadastro encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Organizacao'
+              example:
+                ong_id: ong-123
+                nome_instituicao: Associação Cuidar
+                cnpj: "12345678000199"
+                responsavel_legal: Maria da Silva
+                email: maria@associacaocuidar.org
+                criada_em: "2026-10-01T12:00:00Z"
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '403':
+          $ref: '#/components/responses/Proibido'
+        '404':
+          $ref: '#/components/responses/NaoEncontrado'
+    patch:
+      tags: [organizacoes]
+      operationId: atualizarOrganizacao
+      summary: Atualiza dados cadastrais parciais
+      description: CNPJ não é alterável. Enviar `cnpj` no corpo responde 400.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrganizacaoParcial'
+      responses:
+        '200':
+          description: Cadastro atualizado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Organizacao'
+        '400':
+          $ref: '#/components/responses/RequisicaoInvalida'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '403':
+          $ref: '#/components/responses/Proibido'
+        '404':
+          $ref: '#/components/responses/NaoEncontrado'
+  /v1/organizacoes/{ongId}/usuarios:
+    parameters:
+      - $ref: '#/components/parameters/OngId'
+      - $ref: '#/components/parameters/CorrelationId'
+    post:
+      tags: [usuarios]
+      operationId: criarUsuario
+      summary: Cria um usuário gestor da organização
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NovoUsuario'
+      responses:
+        '201':
+          description: Usuário criado.
+          headers:
+            Location:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Usuario'
+        '400':
+          $ref: '#/components/responses/RequisicaoInvalida'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '403':
+          $ref: '#/components/responses/Proibido'
+        '404':
+          $ref: '#/components/responses/NaoEncontrado'
+        '409':
+          $ref: '#/components/responses/Conflito'
+    get:
+      tags: [usuarios]
+      operationId: listarUsuarios
+      summary: Lista usuários da organização
+      responses:
+        '200':
+          description: Usuários da organização.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [itens]
+                properties:
+                  itens:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Usuario'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '403':
+          $ref: '#/components/responses/Proibido'
+        '404':
+          $ref: '#/components/responses/NaoEncontrado'
+  /v1/sessoes:
+    post:
+      tags: [sessoes]
+      operationId: criarSessao
+      summary: Autentica o gestor e emite o JWT
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Credenciais'
+            example:
+              email: maria@associacaocuidar.org
+              senha: senha-de-exemplo
+      responses:
+        '200':
+          description: Credenciais válidas. O token é o que o gateway valida na gestão.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Sessao'
+              example:
+                tipo: Bearer
+                token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.exemplo
+                expira_em: 3600
+                usuario_id: usr-1
+                ong_id: ong-123
+        '400':
+          $ref: '#/components/responses/RequisicaoInvalida'
+        '401':
+          description: E-mail ou senha incorretos.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+  /v1/sessoes/atual:
+    delete:
+      tags: [sessoes]
+      operationId: encerrarSessao
+      summary: Encerra a sessão do token atual
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '204':
+          description: Sessão encerrada, sem corpo.
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    OngId:
+      name: ongId
+      in: path
+      required: true
+      schema:
+        type: string
+        example: ong-123
+    Limite:
+      name: limite
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    CorrelationId:
+      name: X-Correlation-ID
+      in: header
+      required: false
+      schema:
+        type: string
+        format: uuid
+  schemas:
+    NovaOrganizacao:
+      type: object
+      required: [nome_instituicao, cnpj, responsavel_legal, email]
+      properties:
+        nome_instituicao:
+          type: string
+        cnpj:
+          type: string
+          pattern: '^[0-9]{14}$'
+        responsavel_legal:
+          type: string
+        email:
+          type: string
+          format: email
+    OrganizacaoParcial:
+      type: object
+      minProperties: 1
+      properties:
+        nome_instituicao:
+          type: string
+        responsavel_legal:
+          type: string
+        email:
+          type: string
+          format: email
+    Organizacao:
+      type: object
+      required: [ong_id, nome_instituicao, responsavel_legal]
+      properties:
+        ong_id:
+          type: string
+        nome_instituicao:
+          type: string
+        cnpj:
+          type: string
+        responsavel_legal:
+          type: string
+          description: Campo `instituicao.responsavel_legal` do BFF Gestão.
+        email:
+          type: string
+          format: email
+        criada_em:
+          type: string
+          format: date-time
+    ListaOrganizacoes:
+      type: object
+      required: [itens]
+      properties:
+        itens:
+          type: array
+          items:
+            $ref: '#/components/schemas/Organizacao'
+    NovoUsuario:
+      type: object
+      required: [nome, email, senha]
+      properties:
+        nome:
+          type: string
+        email:
+          type: string
+          format: email
+        senha:
+          type: string
+          minLength: 8
+          writeOnly: true
+    Usuario:
+      type: object
+      required: [usuario_id, nome, email, ong_id]
+      properties:
+        usuario_id:
+          type: string
+        nome:
+          type: string
+        email:
+          type: string
+          format: email
+        ong_id:
+          type: string
+    Credenciais:
+      type: object
+      required: [email, senha]
+      properties:
+        email:
+          type: string
+          format: email
+        senha:
+          type: string
+          writeOnly: true
+    Sessao:
+      type: object
+      required: [tipo, token, expira_em, usuario_id, ong_id]
+      properties:
+        tipo:
+          type: string
+          example: Bearer
+        token:
+          type: string
+        expira_em:
+          type: integer
+          description: Validade em segundos.
+        usuario_id:
+          type: string
+        ong_id:
+          type: string
+    Erro:
+      type: object
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+          format: uri
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string
+  responses:
+    RequisicaoInvalida:
+      description: Corpo ou parâmetro inválido.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Erro'
+    NaoAutenticado:
+      description: JWT ausente, expirado ou assinatura inválida.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Erro'
+    Proibido:
+      description: Usuário autenticado sem permissão sobre a organização.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Erro'
+    NaoEncontrado:
+      description: Recurso não encontrado.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Erro'
+    Conflito:
+      description: CNPJ ou e-mail já cadastrado.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Erro'
+security:
+  - bearerAuth: []

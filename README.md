@@ -46,54 +46,83 @@ Democratizar o acesso à segurança da informação e à conformidade regulatór
 O **ONGSec** atua como um consultor de segurança automatizado e emissor de selos digitais de conformidade cibernética.
 
 **Exemplo Prático (Associação Cuidar):**
-1. **Diagnóstico Automatizado:** Dona Maria, diretora de um abrigo infantil, acessa o **Painel de Gestão (BFF Web)** e responde a um questionário adaptado de higiene digital.
+1. **Diagnóstico Automatizado:** Dona Maria, diretora de um abrigo infantil, acessa o **Painel Web de Gestão** e responde a um questionário adaptado de higiene digital.
 2. **Plano de Ação Tático:** O sistema processa as vulnerabilidades e gera um plano de tarefas de remediação prioritárias.
 3. **Automação com IA (RAG + LangChain):** Ao executar a tarefa *"Elaborar Política de Privacidade"*, Dona Maria aciona o **Assistente IA**. O modelo recupera diretrizes oficiais da ANPD (RAG) e consulta as configurações reais da ONG no sistema via *tools* internas para gerar a política personalizada.
 4. **Validação e Selo Digital:** Após a resolução das pendências e atualização do *score*, o sistema aciona uma orquestração **SAGA** para emitir o Selo Digital de Conformidade.
-5. **Transparência Pública:** Semanas depois, um doador aciona o **Portal Público de Selos (BFF Público)** para validar a reputação digital da ONG. A consulta utiliza uma arquitetura **CQRS** otimizada para respostas instantâneas.
+5. **Transparência Pública:** Semanas depois, um doador abre o **App/Portal Mobile Público** para validar a reputação digital da ONG. A consulta utiliza uma arquitetura **CQRS** otimizada para respostas instantâneas e não exige login.
 
 ---
 
 ## Esboço da Arquitetura Distribuída
 
-O sistema utiliza o padrão de **Microsserviços com Database per Service** (cada serviço possui sua própria instância isolada de banco de dados PostgreSQL no Docker).
+O sistema utiliza o padrão de **Microsserviços com Database per Service** (cada serviço possui sua própria instância isolada de banco de dados). Há dois clientes com necessidades diferentes, e o tráfego externo entra sempre pelo API Gateway antes do BFF correspondente. O detalhamento de rotas, responsabilidades e a diferença entre as respostas está em [`docs/gateway-bffs.md`](docs/gateway-bffs.md).
 
 ```text
-       ┌────────────────────────┐         ┌──────────────────┐
-       │  Cliente Web (Gestão)      │ ─────>  │  BFF 1: Gestão      │
-       └────────────────────────┘         └────────┬─────────┘
-                                                         │
-       ┌────────────────────────┐         ┌────────▼─────────┐
-       │ Cliente Web (Público)      │ ─────>  │  BFF 2: Público     │  ───> [ API Gateway ] ──> [ Microsserviços ]
-       └────────────────────────┘         └──────────────────┘
+ App/Portal Mobile Público                 Painel Web de Gestão
+ (doador, sem login na consulta)           (gestor da ONG, JWT)
+          |                                          |
+          | /api/publico/*                           | /api/gestao/*
+          v                                          v
+                    +----------------------+
+                    |     API Gateway      |
+                    | rate limit, tracing, |
+                    | JWT só na gestão     |
+                    +----------+-----------+
+                               |
+              +----------------+----------------+
+              |                                 |
+              v                                 v
+     +------------------+              +------------------+
+     |   BFF Público    |              |   BFF Gestão     |
+     | resposta enxuta  |              | agrega serviços  |
+     | (leitura CQRS)   |              | e links HATEOAS  |
+     +--------+---------+              +--------+---------+
+              |                                 |
+              v                                 v
+       badge-service                 org, audit, task, badge
 ```
+
+A consulta pública de selo (`GET /api/publico/selos/{ongId}`) é anônima e protegida por *rate limiting* no gateway. As rotas do Painel Web de Gestão exigem JWT válido; requisição sem token ou com token expirado recebe `401` na borda e não chega aos microsserviços.
+
 | Microsserviço de Domínio | Responsabilidade Principal | Tecnologia de Banco de Dados | Justificativa Arquitetural |
 |---|---|---|---|
 | 1. Entidades (org-service) | Gestão de cadastros de ONGs, usuários, perfis e autenticação. | PostgreSQL (Instância 1) | Garantia ACID para dados estruturados de contas e acessos. |
 | 2. Auditoria (audit-service) | Diagnósticos de segurança, checklists dinâmicos e cálculo de risco. | PostgreSQL (Instância 2) | Uso de colunas JSONB nativas para suportar esquemas flexíveis de questionários. |
 | 3. Remediação (task-service) | Ciclo de vida do plano de ação (tarefas, prazos e soluções). | PostgreSQL (Instância 3) | Controle estrito de estados e relacionamentos de tarefas. |
 | 4. Certificação (badge-service) | Emissão, validação e publicação de Selos Digitais de Conformidade. | PostgreSQL (Instância 4) | Separação CQRS mantendo consistência e leitura otimizada no modelo relacional. |
-Padrões e Requisitos Transversais
- * SAGA Orquestrada (Transação Distribuída): O fluxo de Solicitação e Emissão de Selo cruza os serviços Audit -> Task -> Badge. Em caso de reabertura de pendência ou não conformidade, transações compensatórias revertem o status da solicitação.
- * CQRS: O badge-service separa o modelo de escrita do modelo de consulta pública do Portal de Selos, garantindo alta disponibilidade sem sobrecarregar a base principal.
- * Inteligência Artificial: Módulo de RAG alimentado por guias oficiais, integrado via LangChain com consulta a tools internas do sistema.
-Fundamentação e Referências Sólidas
- * ANPD (Autoridade Nacional de Proteção de Dados): Guia Orientativo para Agentes de Tratamento de Pequeno Porte. Brasília: ANPD, 2021.
- * CERT.br (Centro de Estudos, Resposta e Tratamento de Incidentes de Segurança no Brasil): Cartilha de Segurança para a Internet. São Paulo: NIC.br, 2023.
- * CIS (Center for Internet Security): CIS Critical Security Controls Version 8 — Implementation Group 1 (IG1). CIS, 2021.
- * SEBRAE: Guia Prático de Adequação à LGPD para Micro e Pequenas Empresas. Serviço Brasileiro de Apoio às Micro e Pequenas Empresas, 2022.
-Instruções para Execução Local
-> Nota: Ambiente inicial de desenvolvimento. A orquestração completa em containers Docker e Kubernetes será disponibilizada nas etapas 3 e 4.
-> 
-Pré-requisitos
- * Git
- * Docker Desktop (v24.0+) e docker-compose
-Passo a Passo
-# 1. Clonar o repositório
-git clone [https://github.com/nicolas-mtheus/gcc129-ongsec-neurabase.git](https://github.com/nicolas-mtheus/gcc129-ongsec-neurabase.git)
 
-# 2. Acessar o diretório do projeto
+## Padrões e Requisitos Transversais
+
+* **SAGA Orquestrada (Transação Distribuída):** O fluxo de Solicitação e Emissão de Selo cruza os serviços Audit -> Task -> Badge. Em caso de reabertura de pendência ou não conformidade, transações compensatórias revertem o status da solicitação.
+* **CQRS:** O badge-service separa o modelo de escrita do modelo de consulta pública do App/Portal Mobile Público, garantindo alta disponibilidade sem sobrecarregar a base principal.
+* **Inteligência Artificial:** Módulo de RAG alimentado por guias oficiais, integrado via LangChain com consulta a tools internas do sistema. Entra em execução na Parte 4; nesta etapa o fluxo já está previsto na história de uso.
+
+## Fundamentação e Referências
+
+* ANPD (Autoridade Nacional de Proteção de Dados): Guia Orientativo para Agentes de Tratamento de Pequeno Porte. Brasília: ANPD, 2021.
+* CERT.br (Centro de Estudos, Resposta e Tratamento de Incidentes de Segurança no Brasil): Cartilha de Segurança para a Internet. São Paulo: NIC.br, 2023.
+* CIS (Center for Internet Security): CIS Critical Security Controls Version 8 — Implementation Group 1 (IG1). CIS, 2021.
+* SEBRAE: Guia Prático de Adequação à LGPD para Micro e Pequenas Empresas. Serviço Brasileiro de Apoio às Micro e Pequenas Empresas, 2022.
+
+## Instruções para execução local
+
+A Parte 2 entrega a arquitetura documentada (serviços, contratos, gateway, BFFs, persistência, SAGA e CQRS). Não há sistema em execução nesta etapa: Docker e Kubernetes ficam para as Partes 3 e 4, quando um terceiro conseguirá subir o ambiente com um único comando.
+
+### Pré-requisitos
+
+* Git
+* Navegador ou editor capaz de abrir Markdown e, quando os contratos forem integrados, um visualizador OpenAPI (por exemplo, o [Swagger Editor](https://editor.swagger.io/))
+
+### Passo a passo
+
+```bash
+git clone https://github.com/nicolas-mtheus/gcc129-ongsec-neurabase.git
 cd gcc129-ongsec-neurabase
+```
 
-# 3. Subir os serviços e bancos de dados isolados (Em desenvolvimento)
-docker-compose up -d
+1. Leia este README para o problema, os integrantes e o recorte dos quatro microsserviços.
+2. Leia [`docs/gateway-bffs.md`](docs/gateway-bffs.md) para o API Gateway, os dois BFFs e o comparativo de respostas.
+3. Os contratos REST (OpenAPI), o versionamento e o recurso com HATEOAS ficam em `docs/api/` e serão acrescentados ao longo desta etapa.
+
+Não existe `docker-compose.yml` no repositório nesta fase. Qualquer instrução de `docker-compose up` antes da Parte 3 estaria incorreta.

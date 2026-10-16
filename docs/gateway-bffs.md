@@ -31,12 +31,12 @@ graph TD
 
     %% Roteamento Público (Sem JWT)
     App -->|/api/publico/*| Gateway
-    Gateway -->|Acesso Público (Sem JWT, Rate Limiting)| BFF_Pub
+    Gateway -->|Acesso Aberto: Sem JWT e Rate Limiting| BFF_Pub
     BFF_Pub -.->|Consulta CQRS Leve| MS_Badge
 
     %% Roteamento Gestão (Protegido por JWT)
     Web -->|/api/gestao/*| Gateway
-    Gateway -->|Valida Token JWT & Roteia| BFF_Gest
+    Gateway -->|Valida Token JWT e Roteia| BFF_Gest
     BFF_Gest -.->|Agrega Dados| MS_Audit
     BFF_Gest -.->|Agrega Dados| MS_Task
     BFF_Gest -.->|Agrega Dados| MS_Org

@@ -1,0 +1,368 @@
+openapi: 3.0.3
+info:
+  title: ONGSec audit-service
+  version: 1.0.0
+  description: >
+    Questionário de higiene digital, respostas e score de auditoria.
+    O campo `score` deste serviço é o `score_auditoria` do BFF Gestão.
+    A conclusão bem-sucedida corresponde ao evento DIAGNOSTICO_CONCLUIDO.
+servers:
+  - url: http://audit-service:8080
+    description: Rede interna. Não é publicado no API Gateway.
+tags:
+  - name: questionario
+  - name: diagnosticos
+paths:
+  /v1/questionario:
+    get:
+      tags: [questionario]
+      operationId: obterQuestionario
+      summary: Obtém o modelo de perguntas do diagnóstico
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Modelo vigente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Questionario'
+              example:
+                questionario_id: q-lgpd-ig1
+                versao: "2026.1"
+                perguntas:
+                  - pergunta_id: p1
+                    enunciado: A organização mantém inventário dos dados pessoais que trata?
+                    obrigatoria: true
+                  - pergunta_id: p2
+                    enunciado: Existe política de privacidade publicada e revisada?
+                    obrigatoria: true
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+  /v1/organizacoes/{ongId}/diagnosticos:
+    parameters:
+      - $ref: '#/components/parameters/OngId'
+      - $ref: '#/components/parameters/CorrelationId'
+    post:
+      tags: [diagnosticos]
+      operationId: abrirDiagnostico
+      summary: Abre um diagnóstico para a organização
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '201':
+          description: Diagnóstico aberto em RASCUNHO.
+          headers:
+            Location:
+              schema:
+                type: string
+              example: /v1/diagnosticos/diag-55
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Diagnostico'
+              example:
+                diagnostico_id: diag-55
+                ong_id: ong-123
+                questionario_id: q-lgpd-ig1
+                status: RASCUNHO
+                score: null
+                concluido_em: null
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '403':
+          $ref: '#/components/responses/Proibido'
+        '409':
+          description: Já existe diagnóstico em RASCUNHO ou EM_ANDAMENTO para a ONG.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+    get:
+      tags: [diagnosticos]
+      operationId: listarDiagnosticos
+      summary: Lista diagnósticos da organização
+      description: >
+        O BFF Gestão, na rota `/api/gestao/{ongId}/auditoria`, usa esta lista.
+        O score exibido no detalhe do selo é o do diagnóstico CONCLUIDO mais recente.
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/StatusDiagnostico'
+      responses:
+        '200':
+          description: Diagnósticos da organização.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [itens]
+                properties:
+                  itens:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Diagnostico'
+              example:
+                itens:
+                  - diagnostico_id: diag-55
+                    ong_id: ong-123
+                    questionario_id: q-lgpd-ig1
+                    status: CONCLUIDO
+                    score: 92
+                    concluido_em: "2026-10-09T18:00:00Z"
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '403':
+          $ref: '#/components/responses/Proibido'
+  /v1/diagnosticos/{diagnosticoId}:
+    parameters:
+      - $ref: '#/components/parameters/DiagnosticoId'
+      - $ref: '#/components/parameters/CorrelationId'
+    get:
+      tags: [diagnosticos]
+      operationId: obterDiagnostico
+      summary: Obtém um diagnóstico
+      responses:
+        '200':
+          description: Diagnóstico encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Diagnostico'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '403':
+          $ref: '#/components/responses/Proibido'
+        '404':
+          $ref: '#/components/responses/NaoEncontrado'
+  /v1/diagnosticos/{diagnosticoId}/respostas:
+    parameters:
+      - $ref: '#/components/parameters/DiagnosticoId'
+      - $ref: '#/components/parameters/CorrelationId'
+    put:
+      tags: [diagnosticos]
+      operationId: substituirRespostas
+      summary: Substitui o conjunto de respostas
+      description: >
+        PUT porque o corpo é o conjunto completo das respostas, não um
+        pedaço. Status passa a EM_ANDAMENTO.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConjuntoRespostas'
+            example:
+              respostas:
+                - pergunta_id: p1
+                  valor: SIM
+                - pergunta_id: p2
+                  valor: NAO
+      responses:
+        '200':
+          description: Respostas substituídas.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Diagnostico'
+        '400':
+          $ref: '#/components/responses/RequisicaoInvalida'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '403':
+          $ref: '#/components/responses/Proibido'
+        '404':
+          $ref: '#/components/responses/NaoEncontrado'
+        '409':
+          description: Diagnóstico já está CONCLUIDO.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+  /v1/diagnosticos/{diagnosticoId}/conclusao:
+    parameters:
+      - $ref: '#/components/parameters/DiagnosticoId'
+      - $ref: '#/components/parameters/CorrelationId'
+      - $ref: '#/components/parameters/IdempotencyKey'
+    post:
+      tags: [diagnosticos]
+      operationId: concluirDiagnostico
+      summary: Calcula o score e conclui o diagnóstico
+      description: >
+        Transição de estado. Não substitui o recurso por PUT porque o score
+        é calculado pelo serviço. Sucesso registra o fato que a SAGA nomeia
+        DIAGNOSTICO_CONCLUIDO. Repetir a mesma Idempotency-Key devolve o
+        mesmo diagnóstico, sem recalcular.
+      responses:
+        '200':
+          description: Diagnóstico concluído.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Diagnostico'
+              example:
+                diagnostico_id: diag-55
+                ong_id: ong-123
+                questionario_id: q-lgpd-ig1
+                status: CONCLUIDO
+                score: 92
+                concluido_em: "2026-10-09T18:00:00Z"
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '403':
+          $ref: '#/components/responses/Proibido'
+        '404':
+          $ref: '#/components/responses/NaoEncontrado'
+        '409':
+          description: Diagnóstico já concluído com outra chave de idempotência.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+        '422':
+          description: Pergunta obrigatória sem resposta.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    OngId:
+      name: ongId
+      in: path
+      required: true
+      schema:
+        type: string
+        example: ong-123
+    DiagnosticoId:
+      name: diagnosticoId
+      in: path
+      required: true
+      schema:
+        type: string
+        example: diag-55
+    CorrelationId:
+      name: X-Correlation-ID
+      in: header
+      required: false
+      schema:
+        type: string
+        format: uuid
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+        format: uuid
+  schemas:
+    StatusDiagnostico:
+      type: string
+      enum: [RASCUNHO, EM_ANDAMENTO, CONCLUIDO]
+    Questionario:
+      type: object
+      required: [questionario_id, versao, perguntas]
+      properties:
+        questionario_id:
+          type: string
+        versao:
+          type: string
+        perguntas:
+          type: array
+          items:
+            type: object
+            required: [pergunta_id, enunciado, obrigatoria]
+            properties:
+              pergunta_id:
+                type: string
+              enunciado:
+                type: string
+              obrigatoria:
+                type: boolean
+    Resposta:
+      type: object
+      required: [pergunta_id, valor]
+      properties:
+        pergunta_id:
+          type: string
+        valor:
+          type: string
+          enum: [SIM, NAO, NAO_SE_APLICA]
+    ConjuntoRespostas:
+      type: object
+      required: [respostas]
+      properties:
+        respostas:
+          type: array
+          items:
+            $ref: '#/components/schemas/Resposta'
+    Diagnostico:
+      type: object
+      required: [diagnostico_id, ong_id, questionario_id, status]
+      properties:
+        diagnostico_id:
+          type: string
+        ong_id:
+          type: string
+        questionario_id:
+          type: string
+        status:
+          $ref: '#/components/schemas/StatusDiagnostico'
+        score:
+          type: integer
+          nullable: true
+          minimum: 0
+          maximum: 100
+          description: Vira `score_auditoria` no BFF Gestão quando CONCLUIDO.
+        concluido_em:
+          type: string
+          format: date-time
+          nullable: true
+    Erro:
+      type: object
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+          format: uri
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string
+  responses:
+    RequisicaoInvalida:
+      description: Corpo ou parâmetro inválido.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Erro'
+    NaoAutenticado:
+      description: JWT ausente ou inválido.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Erro'
+    Proibido:
+      description: Usuário sem permissão sobre o diagnóstico.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Erro'
+    NaoEncontrado:
+      description: Diagnóstico não encontrado.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Erro'
+security:
+  - bearerAuth: []

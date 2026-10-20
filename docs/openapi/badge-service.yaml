@@ -1,0 +1,493 @@
+openapi: 3.0.3
+info:
+  title: ONGSec badge-service
+  version: 1.0.0
+  description: >
+    Emissão e revogação do selo. A escrita é a solicitação (`/v1/solicitacoes`).
+    A leitura pública é `GET /v1/consulta/organizacoes/{ongId}`, cujo corpo é
+    o mesmo JSON do BFF Público. Esse GET interno não é rota do gateway.
+    A solicitação expõe HATEOAS, inclusive o link de revogação que o BFF
+    Gestão traduz para `/api/gestao/selos/{ongId}/revogar`.
+servers:
+  - url: http://badge-service:8080
+    description: Rede interna. Não é publicado no API Gateway.
+tags:
+  - name: solicitacoes
+  - name: consulta
+  - name: selos
+paths:
+  /v1/solicitacoes:
+    post:
+      tags: [solicitacoes]
+      operationId: abrirSolicitacao
+      summary: Aceita a solicitação de emissão do selo
+      description: >
+        Responde 202 porque o selo só fica ATIVO quando a SAGA registra
+        SELO_GERADO. 422 se ainda houver tarefa pendente no plano informado.
+        A mesma Idempotency-Key não abre duas solicitações.
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NovaSolicitacao'
+            example:
+              ong_id: ong-123
+              diagnostico_id: diag-55
+              plano_id: plano-1
+      responses:
+        '202':
+          description: Solicitação aceita. O estado final ainda não é o selo ativo.
+          headers:
+            Location:
+              schema:
+                type: string
+              example: /v1/solicitacoes/sol-998
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Solicitacao'
+        '400':
+          $ref: '#/components/responses/RequisicaoInvalida'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '409':
+          description: Já existe solicitação em andamento para a organização.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+        '422':
+          description: Plano com tarefas pendentes ou diagnóstico sem score.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+  /v1/solicitacoes/{solicitacaoId}:
+    parameters:
+      - $ref: '#/components/parameters/SolicitacaoId'
+      - $ref: '#/components/parameters/CorrelationId'
+    get:
+      tags: [solicitacoes]
+      operationId: obterSolicitacao
+      summary: Obtém a solicitação, o histórico da SAGA e os links
+      description: >
+        Recurso com HATEOAS. `historico_saga_emissao` usa os mesmos nomes de
+        evento do BFF Gestão. Os `href` são do badge-service; o BFF troca
+        o link `revogar` pelo caminho público documentado no gateway.
+      responses:
+        '200':
+          description: Solicitação e links de navegação.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Solicitacao'
+              example:
+                solicitacao_id: sol-998
+                ong_id: ong-123
+                diagnostico_id: diag-55
+                plano_id: plano-1
+                estado: SELO_EMITIDO
+                id_selo: CERT-2026-998
+                historico_saga_emissao:
+                  - evento: DIAGNOSTICO_CONCLUIDO
+                    servico: audit-service
+                    sucesso: true
+                  - evento: TAREFAS_REMEDIADAS
+                    servico: task-service
+                    sucesso: true
+                  - evento: SELO_GERADO
+                    servico: badge-service
+                    sucesso: true
+                _links:
+                  self:
+                    href: /v1/solicitacoes/sol-998
+                  consulta_publica:
+                    href: /v1/consulta/organizacoes/ong-123
+                  certificacao:
+                    href: /v1/organizacoes/ong-123/certificacao
+                  revogar:
+                    href: /v1/selos/CERT-2026-998/revogacao
+                    method: POST
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '404':
+          $ref: '#/components/responses/NaoEncontrado'
+  /v1/solicitacoes/{solicitacaoId}/compensacoes:
+    parameters:
+      - $ref: '#/components/parameters/SolicitacaoId'
+      - $ref: '#/components/parameters/CorrelationId'
+      - $ref: '#/components/parameters/IdempotencyKey'
+    post:
+      tags: [solicitacoes]
+      operationId: compensarSolicitacao
+      summary: Compensa a solicitação
+      description: >
+        Usada pela SAGA quando um passo posterior falha. Marca a solicitação
+        como COMPENSADA. Se o selo já tinha sido emitido, o status público
+        passa a REVOGADO. O diagrama de quando chamar esta operação fica no
+        documento de SAGA.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [motivo]
+              properties:
+                motivo:
+                  type: string
+      responses:
+        '200':
+          description: Compensação aplicada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Solicitacao'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '404':
+          $ref: '#/components/responses/NaoEncontrado'
+        '409':
+          description: Solicitação já compensada com outra chave de idempotência.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+  /v1/consulta/organizacoes/{ongId}:
+    parameters:
+      - $ref: '#/components/parameters/OngId'
+      - $ref: '#/components/parameters/CorrelationId'
+    get:
+      tags: [consulta]
+      operationId: consultarSeloPublico
+      summary: Lê a projeção pública do selo
+      security: []
+      description: >
+        Modelo de leitura. O corpo é o mesmo de `GET /api/publico/selos/{ongId}`.
+        Não exige JWT de usuário: quem autentica a borda pública é o gateway,
+        por rate limit, e só o BFF Público chama este caminho. Não publica
+        score, responsável legal nem tarefas.
+      responses:
+        '200':
+          description: Projeção pública. Pode estar ATIVO ou REVOGADO.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConsultaPublica'
+              example:
+                id_selo: CERT-2026-998
+                ong_id: ong-123
+                nome_instituicao: Associação Cuidar
+                status_conformidade: ATIVO
+                emitido_em: "2026-10-10T14:00:00Z"
+                mensagem: Instituição verificada e em conformidade com as diretrizes da LGPD.
+        '404':
+          description: A organização não possui selo na projeção de leitura.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+  /v1/organizacoes/{ongId}/certificacao:
+    parameters:
+      - $ref: '#/components/parameters/OngId'
+      - $ref: '#/components/parameters/CorrelationId'
+    get:
+      tags: [selos]
+      operationId: obterCertificacao
+      summary: Lê o selo com o histórico da emissão
+      description: >
+        Fonte, no badge-service, dos campos `id_selo`, `status_conformidade`
+        e `historico_saga_emissao` do BFF Gestão. Não inclui score nem
+        tarefas: esses campos vêm dos outros serviços.
+      responses:
+        '200':
+          description: Certificação da organização.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Certificacao'
+              example:
+                id_selo: CERT-2026-998
+                ong_id: ong-123
+                status_conformidade: ATIVO
+                emitido_em: "2026-10-10T14:00:00Z"
+                historico_saga_emissao:
+                  - evento: DIAGNOSTICO_CONCLUIDO
+                    servico: audit-service
+                    sucesso: true
+                  - evento: TAREFAS_REMEDIADAS
+                    servico: task-service
+                    sucesso: true
+                  - evento: SELO_GERADO
+                    servico: badge-service
+                    sucesso: true
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '404':
+          $ref: '#/components/responses/NaoEncontrado'
+  /v1/selos/{seloId}:
+    parameters:
+      - $ref: '#/components/parameters/SeloId'
+      - $ref: '#/components/parameters/CorrelationId'
+    get:
+      tags: [selos]
+      operationId: obterSelo
+      summary: Obtém o selo pelo identificador de escrita
+      responses:
+        '200':
+          description: Selo encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Selo'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '404':
+          $ref: '#/components/responses/NaoEncontrado'
+  /v1/selos/{seloId}/revogacao:
+    parameters:
+      - $ref: '#/components/parameters/SeloId'
+      - $ref: '#/components/parameters/CorrelationId'
+      - $ref: '#/components/parameters/IdempotencyKey'
+    post:
+      tags: [selos]
+      operationId: revogarSelo
+      summary: Revoga um selo ativo
+      description: >
+        Destino interno do link `revogar_selo` do BFF Gestão
+        (`POST /api/gestao/selos/{ongId}/revogar`).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [motivo]
+              properties:
+                motivo:
+                  type: string
+            example:
+              motivo: Não conformidade reaberta pela gestora.
+      responses:
+        '200':
+          description: Selo revogado. A consulta pública passa a REVOGADO.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Selo'
+              example:
+                id_selo: CERT-2026-998
+                ong_id: ong-123
+                status_conformidade: REVOGADO
+                emitido_em: "2026-10-10T14:00:00Z"
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '404':
+          $ref: '#/components/responses/NaoEncontrado'
+        '409':
+          description: Selo já revogado.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    OngId:
+      name: ongId
+      in: path
+      required: true
+      schema:
+        type: string
+        example: ong-123
+    SolicitacaoId:
+      name: solicitacaoId
+      in: path
+      required: true
+      schema:
+        type: string
+        example: sol-998
+    SeloId:
+      name: seloId
+      in: path
+      required: true
+      schema:
+        type: string
+        example: CERT-2026-998
+    CorrelationId:
+      name: X-Correlation-ID
+      in: header
+      required: false
+      schema:
+        type: string
+        format: uuid
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+        format: uuid
+  schemas:
+    StatusConformidade:
+      type: string
+      enum: [ATIVO, REVOGADO]
+    EstadoSolicitacao:
+      type: string
+      enum: [SOLICITADA, SELO_EMITIDO, COMPENSADA]
+    Link:
+      type: object
+      required: [href]
+      properties:
+        href:
+          type: string
+        method:
+          type: string
+    EventoSaga:
+      type: object
+      required: [evento, servico, sucesso]
+      properties:
+        evento:
+          type: string
+          enum: [DIAGNOSTICO_CONCLUIDO, TAREFAS_REMEDIADAS, SELO_GERADO]
+        servico:
+          type: string
+          enum: [audit-service, task-service, badge-service]
+        sucesso:
+          type: boolean
+    NovaSolicitacao:
+      type: object
+      required: [ong_id, diagnostico_id, plano_id]
+      properties:
+        ong_id:
+          type: string
+        diagnostico_id:
+          type: string
+        plano_id:
+          type: string
+    Solicitacao:
+      type: object
+      required: [solicitacao_id, ong_id, estado, historico_saga_emissao, _links]
+      properties:
+        solicitacao_id:
+          type: string
+        ong_id:
+          type: string
+        diagnostico_id:
+          type: string
+        plano_id:
+          type: string
+        estado:
+          $ref: '#/components/schemas/EstadoSolicitacao'
+        id_selo:
+          type: string
+          nullable: true
+        historico_saga_emissao:
+          type: array
+          items:
+            $ref: '#/components/schemas/EventoSaga'
+        _links:
+          type: object
+          required: [self]
+          properties:
+            self:
+              $ref: '#/components/schemas/Link'
+            consulta_publica:
+              $ref: '#/components/schemas/Link'
+            certificacao:
+              $ref: '#/components/schemas/Link'
+            revogar:
+              $ref: '#/components/schemas/Link'
+            compensar:
+              $ref: '#/components/schemas/Link'
+    ConsultaPublica:
+      type: object
+      required: [id_selo, ong_id, nome_instituicao, status_conformidade, emitido_em, mensagem]
+      properties:
+        id_selo:
+          type: string
+        ong_id:
+          type: string
+        nome_instituicao:
+          type: string
+        status_conformidade:
+          $ref: '#/components/schemas/StatusConformidade'
+        emitido_em:
+          type: string
+          format: date-time
+        mensagem:
+          type: string
+    Certificacao:
+      type: object
+      required: [id_selo, ong_id, status_conformidade, historico_saga_emissao]
+      properties:
+        id_selo:
+          type: string
+        ong_id:
+          type: string
+        status_conformidade:
+          $ref: '#/components/schemas/StatusConformidade'
+        emitido_em:
+          type: string
+          format: date-time
+        historico_saga_emissao:
+          type: array
+          items:
+            $ref: '#/components/schemas/EventoSaga'
+    Selo:
+      type: object
+      required: [id_selo, ong_id, status_conformidade]
+      properties:
+        id_selo:
+          type: string
+        ong_id:
+          type: string
+        status_conformidade:
+          $ref: '#/components/schemas/StatusConformidade'
+        emitido_em:
+          type: string
+          format: date-time
+    Erro:
+      type: object
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+          format: uri
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string
+  responses:
+    RequisicaoInvalida:
+      description: Corpo inválido.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Erro'
+    NaoAutenticado:
+      description: JWT ausente ou inválido.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Erro'
+    NaoEncontrado:
+      description: Solicitação ou selo não encontrado.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Erro'
+security:
+  - bearerAuth: []

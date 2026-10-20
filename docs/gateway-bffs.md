@@ -2,7 +2,7 @@
 
 Este documento detalha a camada de borda do **ONGSec (NeuraBase)**, responsável por centralizar o acesso externo, proteger os microsserviços internos e otimizar a entrega de dados para os diferentes consumidores da plataforma: o **Painel Web de Gestão** (gestores de ONGs e auditores) e o **App/Portal Mobile Público** (doadores e público geral).
 
-## 1. API Gateway: Regras de Roteamento e Responsabilidades
+## 1. API Gateway: Regras de Roteamento e Responsabilidades.
 
 O API Gateway atua como o ponto único de entrada (*Single Point of Entry*) para todo o tráfego externo. Ele não contém regras de negócio relacionadas à emissão do selo LGPD ou à orquestração da SAGA, funcionando exclusivamente como proxy reverso inteligente, roteador de contexto e barreira de segurança perimetral.
 

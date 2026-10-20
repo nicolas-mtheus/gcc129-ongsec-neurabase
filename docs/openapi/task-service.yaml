@@ -1,0 +1,441 @@
+openapi: 3.0.3
+info:
+  title: ONGSec task-service
+  version: 1.0.0
+  description: >
+    Plano de remediação e tarefas. `tarefas_pendentes` alimenta o BFF Gestão.
+    A conclusão de todas as tarefas corresponde ao evento TAREFAS_REMEDIADAS.
+    O recurso Tarefa traz os links HATEOAS de navegação deste serviço.
+servers:
+  - url: http://task-service:8080
+    description: Rede interna. Não é publicado no API Gateway.
+tags:
+  - name: planos
+  - name: tarefas
+paths:
+  /v1/planos:
+    post:
+      tags: [planos]
+      operationId: criarPlano
+      summary: Abre o plano de ação a partir de um diagnóstico concluído
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NovoPlano'
+            example:
+              ong_id: ong-123
+              diagnostico_id: diag-55
+              tarefas:
+                - titulo: Elaborar Política de Privacidade
+                  prazo: "2026-10-20"
+      responses:
+        '201':
+          description: Plano criado.
+          headers:
+            Location:
+              schema:
+                type: string
+              example: /v1/planos/plano-1
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Plano'
+              example:
+                plano_id: plano-1
+                ong_id: ong-123
+                diagnostico_id: diag-55
+                tarefas_pendentes: 1
+        '400':
+          $ref: '#/components/responses/RequisicaoInvalida'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '409':
+          description: A organização já tem plano aberto para esse diagnóstico.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+        '422':
+          description: Diagnóstico informado ainda não está concluído.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+  /v1/planos/{planoId}:
+    parameters:
+      - $ref: '#/components/parameters/PlanoId'
+      - $ref: '#/components/parameters/CorrelationId'
+    get:
+      tags: [planos]
+      operationId: obterPlano
+      summary: Obtém o plano e a quantidade de tarefas pendentes
+      responses:
+        '200':
+          description: Plano encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Plano'
+              example:
+                plano_id: plano-1
+                ong_id: ong-123
+                diagnostico_id: diag-55
+                tarefas_pendentes: 0
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '403':
+          $ref: '#/components/responses/Proibido'
+        '404':
+          $ref: '#/components/responses/NaoEncontrado'
+  /v1/planos/{planoId}/tarefas:
+    parameters:
+      - $ref: '#/components/parameters/PlanoId'
+      - $ref: '#/components/parameters/CorrelationId'
+    get:
+      tags: [tarefas]
+      operationId: listarTarefas
+      summary: Lista as tarefas do plano
+      responses:
+        '200':
+          description: Tarefas do plano, cada uma com links de navegação.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [itens]
+                properties:
+                  itens:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Tarefa'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '404':
+          $ref: '#/components/responses/NaoEncontrado'
+  /v1/planos/{planoId}/reabertura:
+    parameters:
+      - $ref: '#/components/parameters/PlanoId'
+      - $ref: '#/components/parameters/CorrelationId'
+      - $ref: '#/components/parameters/IdempotencyKey'
+    post:
+      tags: [planos]
+      operationId: reabrirPlano
+      summary: Reabre tarefas concluídas
+      description: >
+        Operação usada pela compensação da SAGA quando o selo não pode
+        permanecer emitido. Não apaga o histórico: as tarefas concluídas
+        voltam para REABERTA e `tarefas_pendentes` deixa de ser zero.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [motivo]
+              properties:
+                motivo:
+                  type: string
+            example:
+              motivo: Pendência reaberta após falha na emissão do selo.
+      responses:
+        '200':
+          description: Plano reaberto.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Plano'
+              example:
+                plano_id: plano-1
+                ong_id: ong-123
+                diagnostico_id: diag-55
+                tarefas_pendentes: 1
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '404':
+          $ref: '#/components/responses/NaoEncontrado'
+        '409':
+          description: Plano já reaberto com outra chave de idempotência.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+  /v1/organizacoes/{ongId}/plano-atual:
+    parameters:
+      - $ref: '#/components/parameters/OngId'
+      - $ref: '#/components/parameters/CorrelationId'
+    get:
+      tags: [planos]
+      operationId: obterPlanoAtual
+      summary: Obtém o plano corrente da organização
+      description: >
+        Fonte do campo `tarefas_pendentes` no `GET /api/gestao/selos/{ongId}/detalhes`.
+      responses:
+        '200':
+          description: Plano corrente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Plano'
+              example:
+                plano_id: plano-1
+                ong_id: ong-123
+                diagnostico_id: diag-55
+                tarefas_pendentes: 0
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '404':
+          description: A organização não tem plano.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+  /v1/tarefas/{tarefaId}:
+    parameters:
+      - $ref: '#/components/parameters/TarefaId'
+      - $ref: '#/components/parameters/CorrelationId'
+    get:
+      tags: [tarefas]
+      operationId: obterTarefa
+      summary: Obtém a tarefa e os links para as próximas ações
+      description: >
+        Recurso com HATEOAS. O cliente (aqui, o BFF) descobre concluir e
+        reabrir pelo `_links`, sem montar a URL à mão. `reabrir` aponta
+        para o plano, porque a reabertura é do plano inteiro.
+      responses:
+        '200':
+          description: Tarefa e links de navegação.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tarefa'
+              example:
+                tarefa_id: tar-77
+                plano_id: plano-1
+                ong_id: ong-123
+                titulo: Elaborar Política de Privacidade
+                status: PENDENTE
+                prazo: "2026-10-20"
+                _links:
+                  self:
+                    href: /v1/tarefas/tar-77
+                  plano:
+                    href: /v1/planos/plano-1
+                  concluir:
+                    href: /v1/tarefas/tar-77/conclusao
+                    method: POST
+                  reabrir:
+                    href: /v1/planos/plano-1/reabertura
+                    method: POST
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '403':
+          $ref: '#/components/responses/Proibido'
+        '404':
+          $ref: '#/components/responses/NaoEncontrado'
+  /v1/tarefas/{tarefaId}/conclusao:
+    parameters:
+      - $ref: '#/components/parameters/TarefaId'
+      - $ref: '#/components/parameters/CorrelationId'
+      - $ref: '#/components/parameters/IdempotencyKey'
+    post:
+      tags: [tarefas]
+      operationId: concluirTarefa
+      summary: Marca a tarefa como concluída
+      responses:
+        '200':
+          description: Tarefa concluída. Os links deixam de oferecer `concluir`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tarefa'
+              example:
+                tarefa_id: tar-77
+                plano_id: plano-1
+                ong_id: ong-123
+                titulo: Elaborar Política de Privacidade
+                status: CONCLUIDA
+                prazo: "2026-10-20"
+                _links:
+                  self:
+                    href: /v1/tarefas/tar-77
+                  plano:
+                    href: /v1/planos/plano-1
+                  reabrir:
+                    href: /v1/planos/plano-1/reabertura
+                    method: POST
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '404':
+          $ref: '#/components/responses/NaoEncontrado'
+        '409':
+          description: Tarefa já concluída com outra chave de idempotência.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    OngId:
+      name: ongId
+      in: path
+      required: true
+      schema:
+        type: string
+        example: ong-123
+    PlanoId:
+      name: planoId
+      in: path
+      required: true
+      schema:
+        type: string
+        example: plano-1
+    TarefaId:
+      name: tarefaId
+      in: path
+      required: true
+      schema:
+        type: string
+        example: tar-77
+    CorrelationId:
+      name: X-Correlation-ID
+      in: header
+      required: false
+      schema:
+        type: string
+        format: uuid
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+        format: uuid
+  schemas:
+    StatusTarefa:
+      type: string
+      enum: [PENDENTE, CONCLUIDA, REABERTA]
+    Link:
+      type: object
+      required: [href]
+      properties:
+        href:
+          type: string
+        method:
+          type: string
+    NovaTarefa:
+      type: object
+      required: [titulo, prazo]
+      properties:
+        titulo:
+          type: string
+        prazo:
+          type: string
+          format: date
+    NovoPlano:
+      type: object
+      required: [ong_id, diagnostico_id, tarefas]
+      properties:
+        ong_id:
+          type: string
+        diagnostico_id:
+          type: string
+        tarefas:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/NovaTarefa'
+    Plano:
+      type: object
+      required: [plano_id, ong_id, diagnostico_id, tarefas_pendentes]
+      properties:
+        plano_id:
+          type: string
+        ong_id:
+          type: string
+        diagnostico_id:
+          type: string
+        tarefas_pendentes:
+          type: integer
+          minimum: 0
+          description: Copiado para o BFF Gestão quando o plano é o corrente.
+    Tarefa:
+      type: object
+      required: [tarefa_id, plano_id, ong_id, titulo, status, _links]
+      properties:
+        tarefa_id:
+          type: string
+        plano_id:
+          type: string
+        ong_id:
+          type: string
+        titulo:
+          type: string
+        status:
+          $ref: '#/components/schemas/StatusTarefa'
+        prazo:
+          type: string
+          format: date
+        _links:
+          type: object
+          required: [self, plano]
+          properties:
+            self:
+              $ref: '#/components/schemas/Link'
+            plano:
+              $ref: '#/components/schemas/Link'
+            concluir:
+              $ref: '#/components/schemas/Link'
+            reabrir:
+              $ref: '#/components/schemas/Link'
+    Erro:
+      type: object
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+          format: uri
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string
+  responses:
+    RequisicaoInvalida:
+      description: Corpo inválido.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Erro'
+    NaoAutenticado:
+      description: JWT ausente ou inválido.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Erro'
+    Proibido:
+      description: Usuário sem permissão sobre a tarefa.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Erro'
+    NaoEncontrado:
+      description: Plano ou tarefa não encontrado.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Erro'
+security:
+  - bearerAuth: []

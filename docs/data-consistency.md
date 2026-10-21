@@ -34,7 +34,7 @@ Dual write é gravar em dois sistemas diferentes (o banco de dados e o broker de
 
 Diferente da consistência eventual, que se corrige sozinha, esse tipo de falha deixa os dados inconsistentes de forma permanente, sem que nenhum erro seja percebido.
 
-O risco aparece em todo serviço que altera o próprio banco e depois avisa outro serviço: audit-service (`DIAGNOSTICO_CONCLUIDO`), task-service (`TAREFAS_REMEDIADAS`) e badge-service (`SELO_GERADO`).
+O risco aparece em todo serviço que altera o próprio banco e depois avisa outro serviço: audit-service (`DIAGNOSTICO_CONCLUIDO`), task-service (`TAREFAS_REMEDIADAS`), badge-service (`SELO_GERADO` e `SELO_REVOGADO`) e org-service (`ORGANIZACAO_ATUALIZADA`).
 
 ## 4. Padrão Outbox
 

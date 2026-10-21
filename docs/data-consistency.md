@@ -21,7 +21,7 @@ Como cada serviço tem seu próprio banco, não existe uma transação única qu
 
 | Ponto | O que fica defasado | Por que é aceitável |
 |---|---|---|
-| SAGA de emissão do selo (Audit → Task → Badge) | Entre `DIAGNOSTICO_CONCLUIDO` e `SELO_GERADO`, a auditoria já está concluída, mas o selo ainda não existe | O processo é assíncrono e o cliente é informado de que a emissão está em andamento |
+| SAGA de emissão do selo (Audit → Task → Badge) | Entre `DIAGNOSTICO_CONCLUIDO` e `SELO_GERADO`, a auditoria já está concluída, mas o selo ainda não existe | O processo é assíncrono, a solicitação de selo responde `202` (aceita) e a emissão continua na SAGA |
 | Modelo de leitura do CQRS (badge-service) | O selo foi emitido ou revogado, mas a consulta pública ainda mostra o estado anterior | A defasagem máxima aceitável está definida em `docs/cqrs.md` |
 | Nome da instituição no modelo de leitura | O org-service é dono do nome, mas o modelo de leitura guarda uma cópia que pode ficar desatualizada por um tempo | O nome muda raramente e a cópia é atualizada por evento |
 
@@ -34,7 +34,7 @@ Dual write é gravar em dois sistemas diferentes (o banco de dados e o broker de
 
 Diferente da consistência eventual, que se corrige sozinha, esse tipo de falha deixa os dados inconsistentes de forma permanente, sem que nenhum erro seja percebido.
 
-O risco aparece em todo serviço que altera o próprio banco e depois avisa outro serviço: audit-service (`DIAGNOSTICO_CONCLUIDO`), task-service (`TAREFAS_REMEDIADAS`), badge-service (`SELO_GERADO` e `SELO_REVOGADO`) e org-service (`ORGANIZACAO_ATUALIZADA`).
+O risco aparece em todo serviço que altera o próprio banco e depois avisa outro serviço: audit-service (`DIAGNOSTICO_CONCLUIDO`), task-service (`TAREFAS_REMEDIADAS`) e badge-service (`SELO_GERADO` e `SELO_REVOGADO`).
 
 ## 4. Padrão Outbox
 
@@ -84,7 +84,7 @@ Esboço ilustrativo da tabela em SQL (PostgreSQL):
 CREATE TABLE outbox (
   id              UUID PRIMARY KEY,
   tipo_evento     VARCHAR(50) NOT NULL,
-  ong_id          UUID NOT NULL,
+  ong_id          VARCHAR(50) NOT NULL,
   payload         JSONB NOT NULL,
   correlation_id  VARCHAR(100),
   criado_em       TIMESTAMP NOT NULL DEFAULT now(),

@@ -46,11 +46,11 @@ Democratizar o acesso à segurança da informação e à conformidade regulatór
 O **ONGSec** atua como um consultor de segurança automatizado e emissor de selos digitais de conformidade cibernética.
 
 **Exemplo Prático (Associação Cuidar):**
-1. **Diagnóstico Automatizado:** Dona Maria, diretora de um abrigo infantil, acessa o **Painel Web de Gestão** e responde a um questionário adaptado de higiene digital.
+1. **Diagnóstico Automatizado:** Dona Maria, diretora de um abrigo infantil, acessa o **Portal Web de Gestão** e responde a um questionário adaptado de higiene digital.
 2. **Plano de Ação Tático:** O sistema processa as vulnerabilidades e gera um plano de tarefas de remediação prioritárias.
 3. **Automação com IA (RAG + LangChain):** Ao executar a tarefa *"Elaborar Política de Privacidade"*, Dona Maria aciona o **Assistente IA**. O modelo recupera diretrizes oficiais da ANPD (RAG) e consulta as configurações reais da ONG no sistema via *tools* internas para gerar a política personalizada.
 4. **Validação e Selo Digital:** Após a resolução das pendências e atualização do *score*, o sistema aciona uma orquestração **SAGA** para emitir o Selo Digital de Conformidade.
-5. **Transparência Pública:** Semanas depois, um doador abre o **App/Portal Mobile Público** para validar a reputação digital da ONG. A consulta utiliza uma arquitetura **CQRS** otimizada para respostas instantâneas e não exige login.
+5. **Transparência Pública:** Semanas depois, um doador abre o **Portal Mobile** para validar a reputação digital da ONG. A consulta utiliza uma arquitetura **CQRS** otimizada para respostas instantâneas e não exige login.
 
 ---
 
@@ -58,32 +58,13 @@ O **ONGSec** atua como um consultor de segurança automatizado e emissor de selo
 
 O sistema utiliza o padrão de **Microsserviços com Database per Service** (cada serviço possui sua própria instância isolada de banco de dados). Há dois clientes com necessidades diferentes, e o tráfego externo entra sempre pelo API Gateway antes do BFF correspondente. As fronteiras dos quatro serviços estão em [`docs/microservicos.md`](docs/microservicos.md). O detalhamento de rotas, responsabilidades e a diferença entre as respostas dos BFFs está em [`docs/gateway-bffs.md`](docs/gateway-bffs.md).
 
-```text
- App/Portal Mobile Público                 Painel Web de Gestão
- (doador, sem login na consulta)           (gestor da ONG, JWT)
-          |                                          |
-          | /api/publico/*                           | /api/gestao/*
-          v                                          v
-                    +----------------------+
-                    |     API Gateway      |
-                    | rate limit, tracing, |
-                    | JWT só na gestão     |
-                    +----------+-----------+
-                               |
-              +----------------+----------------+
-              |                                 |
-              v                                 v
-     +------------------+              +------------------+
-     |   BFF Público    |              |   BFF Gestão     |
-     | resposta enxuta  |              | agrega serviços  |
-     | (leitura CQRS)   |              | e links HATEOAS  |
-     +--------+---------+              +--------+---------+
-              |                                 |
-              v                                 v
-       badge-service                 org, audit, task, badge
-```
+<p align="center">
+  <img src="docs/img/arquitetura-geral.png" alt="ONGSec - Arquitetura geral: dois clientes, API Gateway, dois BFFs, quatro servicos e CQRS" width="90%" />
+</p>
 
-A consulta pública de selo (`GET /api/publico/selos/{ongId}`) é anônima e protegida por *rate limiting* no gateway. As rotas do Painel Web de Gestão exigem JWT válido; requisição sem token ou com token expirado recebe `401` na borda e não chega aos microsserviços.
+*Cliente 1 (Portal Mobile, verde) consulta o selo sem login e cai no BFF Público, que lê só o modelo CQRS de leitura. Cliente 2 (Portal Web de Gestão, azul) entra com JWT; o gateway encaminha ao BFF Gestão, que agrega org-service, audit-service, task-service e a escrita do badge-service. A linha amarela pontilhada é a SAGA orquestrada (Audit → Task → Badge). Os dois lados do badge compartilham o PostgreSQL 4.*
+
+A consulta pública de selo (`GET /api/publico/selos/{ongId}`) é anônima e protegida por *rate limiting* no gateway. As rotas do Portal Web de Gestão exigem JWT válido; requisição sem token ou com token expirado recebe `401` na borda e não chega aos microsserviços.
 
 | Microsserviço de Domínio | Responsabilidade Principal | Tecnologia de Banco de Dados | Justificativa Arquitetural |
 |---|---|---|---|
@@ -95,7 +76,7 @@ A consulta pública de selo (`GET /api/publico/selos/{ongId}`) é anônima e pro
 ## Padrões e Requisitos Transversais
 
 * **SAGA Orquestrada (Transação Distribuída):** O fluxo de Solicitação e Emissão de Selo cruza Audit → Task → Badge. Caminho feliz, falha e compensações estão em [`docs/saga.md`](docs/saga.md).
-* **CQRS:** O badge-service separa o modelo de escrita do modelo de consulta pública do App/Portal Mobile Público. O detalhe está em [`docs/cqrs.md`](docs/cqrs.md).
+* **CQRS:** O badge-service separa o modelo de escrita do modelo de consulta pública do Portal Mobile. O detalhe está em [`docs/cqrs.md`](docs/cqrs.md).
 * **Persistência:** um banco por serviço, consistência eventual, risco de *dual write* e o fluxo de *outbox* estão em [`docs/data-consistency.md`](docs/data-consistency.md).
 * **Inteligência Artificial:** Módulo de RAG alimentado por guias oficiais, integrado via LangChain com consulta a tools internas do sistema. Entra em execução na Parte 4; nesta etapa o fluxo já está previsto na história de uso.
 
@@ -103,6 +84,7 @@ A consulta pública de selo (`GET /api/publico/selos/{ongId}`) é anônima e pro
 
 | Documento | Conteúdo |
 |---|---|
+| [`docs/img/arquitetura-geral.png`](docs/img/arquitetura-geral.png) | Diagrama geral usado na apresentação |
 | [`docs/microservicos.md`](docs/microservicos.md) | Quatro serviços, fronteiras, cortes recusados e diagrama de comunicação |
 | [`docs/saga.md`](docs/saga.md) | SAGA orquestrada: passos, compensações, caminho feliz e falha |
 | [`docs/gateway-bffs.md`](docs/gateway-bffs.md) | API Gateway, dois BFFs e comparativo de respostas |
@@ -139,7 +121,7 @@ git clone https://github.com/nicolas-mtheus/gcc129-ongsec-neurabase.git
 cd gcc129-ongsec-neurabase
 ```
 
-1. Leia este README para o problema, os integrantes e o recorte dos quatro microsserviços.
+1. Leia este README para o problema, os integrantes e o diagrama geral da arquitetura.
 2. Leia [`docs/microservicos.md`](docs/microservicos.md) para as responsabilidades, as fronteiras e o diagrama de comunicação.
 3. Leia [`docs/saga.md`](docs/saga.md) para a emissão do selo, as compensações e os dois diagramas de sequência.
 4. Leia [`docs/gateway-bffs.md`](docs/gateway-bffs.md) para o API Gateway, os dois BFFs e o comparativo de respostas.

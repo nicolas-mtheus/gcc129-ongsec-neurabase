@@ -30,8 +30,9 @@ Uma tabela separada, desnormalizada e pronta para consulta, sem junções:
 | nome_instituicao | Cópia do nome, vinda do org-service |
 | status_conformidade | Por exemplo ATIVO ou REVOGADO |
 | emitido_em | Data de emissão |
+| mensagem | Texto pronto para o doador, preenchido pelo projetor conforme o status |
 
-Ela é lida pelo `GET /v1/consulta/organizacoes/{ongId}`, que o BFF Público chama pela rede interna. Fica na mesma instância PostgreSQL do badge-service, em tabela própria, e a leitura nunca escreve nela. Os campos acima correspondem aos retornados pela consulta pública descrita em `docs/gateway-bffs.md`.
+Ela é lida pelo `GET /v1/consulta/organizacoes/{ongId}`, que o BFF Público chama pela rede interna e devolve sem acrescentar campo (ver `docs/api/alinhamento-bff.md`). Por isso a tabela já guarda a `mensagem` exibida ao doador. Fica na mesma instância PostgreSQL do badge-service, em tabela própria, e a leitura nunca escreve nela. Os campos acima correspondem aos retornados pela consulta pública descrita em `docs/gateway-bffs.md`.
 
 O `nome_instituicao` é uma cópia de um dado pertencente ao org-service. Isso evita uma chamada extra a cada consulta e mantém a consulta pública funcionando mesmo se o org-service estiver indisponível, ao custo de uma possível defasagem (ver `docs/data-consistency.md`, seção 2).
 
@@ -43,7 +44,8 @@ CREATE TABLE selo_publico (
   id_selo             VARCHAR(50) NOT NULL,
   nome_instituicao    VARCHAR(200) NOT NULL,
   status_conformidade VARCHAR(20) NOT NULL,
-  emitido_em          TIMESTAMP NOT NULL
+  emitido_em          TIMESTAMP NOT NULL,
+  mensagem            VARCHAR(200) NOT NULL
 );
 ```
 
@@ -52,8 +54,8 @@ CREATE TABLE selo_publico (
 Um **projetor** consome os eventos publicados pela outbox e atualiza a tabela de leitura:
 
 1. `SELO_GERADO` cria ou atualiza o registro da ONG com status ATIVO.
-2. `SELO_REVOGADO`, publicado pelo badge-service pela outbox quando um selo é revogado (ver `docs/saga.md`), altera o status para REVOGADO.
-3. `ORGANIZACAO_ATUALIZADA`, publicado pelo org-service quando o cadastro da ONG muda, atualiza o `nome_instituicao`.
+2. `SELO_REVOGADO`(definido em `docs/saga.md`) altera o status para REVOGADO e atualiza a mensagem.
+3. Um evento de alteração do cadastro da ONG, publicado pelo org-service na sua própria outbox (nome proposto: `ORGANIZACAO_ATUALIZADA`), atualiza o `nome_instituicao`.
 
 A atualização é idempotente: é um upsert pela chave `ong_id`, então receber o mesmo evento duas vezes produz o mesmo resultado. Se o projetor ficar fora do ar, a consulta continua respondendo com o último estado conhecido, e ele reprocessa os eventos pendentes quando voltar.
 

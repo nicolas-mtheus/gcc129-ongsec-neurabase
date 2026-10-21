@@ -56,7 +56,7 @@ O **ONGSec** atua como um consultor de segurança automatizado e emissor de selo
 
 ## Esboço da Arquitetura Distribuída
 
-O sistema utiliza o padrão de **Microsserviços com Database per Service** (cada serviço possui sua própria instância isolada de banco de dados). Há dois clientes com necessidades diferentes, e o tráfego externo entra sempre pelo API Gateway antes do BFF correspondente. O detalhamento de rotas, responsabilidades e a diferença entre as respostas está em [`docs/gateway-bffs.md`](docs/gateway-bffs.md).
+O sistema utiliza o padrão de **Microsserviços com Database per Service** (cada serviço possui sua própria instância isolada de banco de dados). Há dois clientes com necessidades diferentes, e o tráfego externo entra sempre pelo API Gateway antes do BFF correspondente. As fronteiras dos quatro serviços estão em [`docs/microservicos.md`](docs/microservicos.md). O detalhamento de rotas, responsabilidades e a diferença entre as respostas dos BFFs está em [`docs/gateway-bffs.md`](docs/gateway-bffs.md).
 
 ```text
  App/Portal Mobile Público                 Painel Web de Gestão
@@ -95,8 +95,24 @@ A consulta pública de selo (`GET /api/publico/selos/{ongId}`) é anônima e pro
 ## Padrões e Requisitos Transversais
 
 * **SAGA Orquestrada (Transação Distribuída):** O fluxo de Solicitação e Emissão de Selo cruza os serviços Audit -> Task -> Badge. Em caso de reabertura de pendência ou não conformidade, transações compensatórias revertem o status da solicitação.
-* **CQRS:** O badge-service separa o modelo de escrita do modelo de consulta pública do App/Portal Mobile Público, garantindo alta disponibilidade sem sobrecarregar a base principal.
+* **CQRS:** O badge-service separa o modelo de escrita do modelo de consulta pública do App/Portal Mobile Público. O detalhe está em [`docs/cqrs.md`](docs/cqrs.md).
+* **Persistência:** um banco por serviço, consistência eventual, risco de *dual write* e o fluxo de *outbox* estão em [`docs/data-consistency.md`](docs/data-consistency.md).
 * **Inteligência Artificial:** Módulo de RAG alimentado por guias oficiais, integrado via LangChain com consulta a tools internas do sistema. Entra em execução na Parte 4; nesta etapa o fluxo já está previsto na história de uso.
+
+## Documentação da Parte 2
+
+| Documento | Conteúdo |
+|---|---|
+| [`docs/microservicos.md`](docs/microservicos.md) | Quatro serviços de domínio e fronteiras |
+| [`docs/gateway-bffs.md`](docs/gateway-bffs.md) | API Gateway, dois BFFs e comparativo de respostas |
+| [`docs/api/versionamento.md`](docs/api/versionamento.md) | Versionamento `/v1`, verbos HTTP, status e HATEOAS |
+| [`docs/openapi/org-service.yaml`](docs/openapi/org-service.yaml) | Contrato REST do org-service |
+| [`docs/openapi/audit-service.yaml`](docs/openapi/audit-service.yaml) | Contrato REST do audit-service |
+| [`docs/openapi/task-service.yaml`](docs/openapi/task-service.yaml) | Contrato REST do task-service (HATEOAS em `Tarefa`) |
+| [`docs/openapi/badge-service.yaml`](docs/openapi/badge-service.yaml) | Contrato REST do badge-service (HATEOAS em `SolicitacaoSelo`) |
+| [`docs/api/alinhamento-bff.md`](docs/api/alinhamento-bff.md) | Conferência dos contratos com os JSON dos BFFs |
+| [`docs/data-consistency.md`](docs/data-consistency.md) | Database per service, consistência eventual e outbox |
+| [`docs/cqrs.md`](docs/cqrs.md) | Modelos de escrita e leitura do badge-service |
 
 ## Fundamentação e Referências
 
@@ -107,12 +123,13 @@ A consulta pública de selo (`GET /api/publico/selos/{ongId}`) é anônima e pro
 
 ## Instruções para execução local
 
-A Parte 2 entrega a arquitetura documentada (serviços, contratos, gateway, BFFs, persistência, SAGA e CQRS). Não há sistema em execução nesta etapa: Docker e Kubernetes ficam para as Partes 3 e 4, quando um terceiro conseguirá subir o ambiente com um único comando.
+A Parte 2 entrega a arquitetura documentada. Não há sistema em execução nesta etapa: Docker e Kubernetes ficam para as Partes 3 e 4, quando um terceiro conseguirá subir o ambiente com um único comando.
 
 ### Pré-requisitos
 
 * Git
-* Navegador ou editor capaz de abrir Markdown e, quando os contratos forem integrados, um visualizador OpenAPI (por exemplo, o [Swagger Editor](https://editor.swagger.io/))
+* Navegador ou editor capaz de abrir Markdown
+* Um visualizador OpenAPI, por exemplo o [Swagger Editor](https://editor.swagger.io/), para os arquivos em `docs/openapi/`
 
 ### Passo a passo
 
@@ -122,7 +139,9 @@ cd gcc129-ongsec-neurabase
 ```
 
 1. Leia este README para o problema, os integrantes e o recorte dos quatro microsserviços.
-2. Leia [`docs/gateway-bffs.md`](docs/gateway-bffs.md) para o API Gateway, os dois BFFs e o comparativo de respostas.
-3. Os contratos REST (OpenAPI), o versionamento e o recurso com HATEOAS ficam em `docs/api/` e serão acrescentados ao longo desta etapa.
+2. Leia [`docs/microservicos.md`](docs/microservicos.md) para as responsabilidades e fronteiras de cada serviço.
+3. Leia [`docs/gateway-bffs.md`](docs/gateway-bffs.md) para o API Gateway, os dois BFFs e o comparativo de respostas.
+4. Leia [`docs/api/versionamento.md`](docs/api/versionamento.md) e os contratos em `docs/openapi/`. A conferência com os JSON dos BFFs está em [`docs/api/alinhamento-bff.md`](docs/api/alinhamento-bff.md).
+5. Leia [`docs/data-consistency.md`](docs/data-consistency.md) e [`docs/cqrs.md`](docs/cqrs.md) para persistência e o modelo de leitura do selo.
 
 Não existe `docker-compose.yml` no repositório nesta fase. Qualquer instrução de `docker-compose up` antes da Parte 3 estaria incorreta.

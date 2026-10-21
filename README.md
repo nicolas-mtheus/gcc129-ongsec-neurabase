@@ -94,7 +94,7 @@ A consulta pública de selo (`GET /api/publico/selos/{ongId}`) é anônima e pro
 
 ## Padrões e Requisitos Transversais
 
-* **SAGA Orquestrada (Transação Distribuída):** O fluxo de Solicitação e Emissão de Selo cruza os serviços Audit -> Task -> Badge. Em caso de reabertura de pendência ou não conformidade, transações compensatórias revertem o status da solicitação.
+* **SAGA Orquestrada (Transação Distribuída):** O fluxo de Solicitação e Emissão de Selo cruza Audit → Task → Badge. Caminho feliz, falha e compensações estão em [`docs/saga.md`](docs/saga.md).
 * **CQRS:** O badge-service separa o modelo de escrita do modelo de consulta pública do App/Portal Mobile Público. O detalhe está em [`docs/cqrs.md`](docs/cqrs.md).
 * **Persistência:** um banco por serviço, consistência eventual, risco de *dual write* e o fluxo de *outbox* estão em [`docs/data-consistency.md`](docs/data-consistency.md).
 * **Inteligência Artificial:** Módulo de RAG alimentado por guias oficiais, integrado via LangChain com consulta a tools internas do sistema. Entra em execução na Parte 4; nesta etapa o fluxo já está previsto na história de uso.
@@ -103,7 +103,8 @@ A consulta pública de selo (`GET /api/publico/selos/{ongId}`) é anônima e pro
 
 | Documento | Conteúdo |
 |---|---|
-| [`docs/microservicos.md`](docs/microservicos.md) | Quatro serviços de domínio e fronteiras |
+| [`docs/microservicos.md`](docs/microservicos.md) | Quatro serviços, fronteiras, cortes recusados e diagrama de comunicação |
+| [`docs/saga.md`](docs/saga.md) | SAGA orquestrada: passos, compensações, caminho feliz e falha |
 | [`docs/gateway-bffs.md`](docs/gateway-bffs.md) | API Gateway, dois BFFs e comparativo de respostas |
 | [`docs/api/versionamento.md`](docs/api/versionamento.md) | Versionamento `/v1`, verbos HTTP, status e HATEOAS |
 | [`docs/openapi/org-service.yaml`](docs/openapi/org-service.yaml) | Contrato REST do org-service |
@@ -139,9 +140,10 @@ cd gcc129-ongsec-neurabase
 ```
 
 1. Leia este README para o problema, os integrantes e o recorte dos quatro microsserviços.
-2. Leia [`docs/microservicos.md`](docs/microservicos.md) para as responsabilidades e fronteiras de cada serviço.
-3. Leia [`docs/gateway-bffs.md`](docs/gateway-bffs.md) para o API Gateway, os dois BFFs e o comparativo de respostas.
-4. Leia [`docs/api/versionamento.md`](docs/api/versionamento.md) e os contratos em `docs/openapi/`. A conferência com os JSON dos BFFs está em [`docs/api/alinhamento-bff.md`](docs/api/alinhamento-bff.md).
-5. Leia [`docs/data-consistency.md`](docs/data-consistency.md) e [`docs/cqrs.md`](docs/cqrs.md) para persistência e o modelo de leitura do selo.
+2. Leia [`docs/microservicos.md`](docs/microservicos.md) para as responsabilidades, as fronteiras e o diagrama de comunicação.
+3. Leia [`docs/saga.md`](docs/saga.md) para a emissão do selo, as compensações e os dois diagramas de sequência.
+4. Leia [`docs/gateway-bffs.md`](docs/gateway-bffs.md) para o API Gateway, os dois BFFs e o comparativo de respostas.
+5. Leia [`docs/api/versionamento.md`](docs/api/versionamento.md) e os contratos em `docs/openapi/`. A conferência com os JSON dos BFFs está em [`docs/api/alinhamento-bff.md`](docs/api/alinhamento-bff.md).
+6. Leia [`docs/data-consistency.md`](docs/data-consistency.md) e [`docs/cqrs.md`](docs/cqrs.md) para persistência e o modelo de leitura do selo.
 
 Não existe `docker-compose.yml` no repositório nesta fase. Qualquer instrução de `docker-compose up` antes da Parte 3 estaria incorreta.

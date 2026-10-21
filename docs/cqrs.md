@@ -39,8 +39,8 @@ Esboço ilustrativo da tabela em SQL (PostgreSQL):
 
 ```sql
 CREATE TABLE selo_publico (
-  ong_id              UUID PRIMARY KEY,
-  id_selo             UUID NOT NULL,
+  ong_id              VARCHAR(50) PRIMARY KEY,
+  id_selo             VARCHAR(50) NOT NULL,
   nome_instituicao    VARCHAR(200) NOT NULL,
   status_conformidade VARCHAR(20) NOT NULL,
   emitido_em          TIMESTAMP NOT NULL
@@ -52,8 +52,8 @@ CREATE TABLE selo_publico (
 Um **projetor** consome os eventos publicados pela outbox e atualiza a tabela de leitura:
 
 1. `SELO_GERADO` cria ou atualiza o registro da ONG com status ATIVO.
-2. O evento de revogação (nome a confirmar, conforme `docs/saga.md`) altera o status para REVOGADO.
-3. O evento de alteração do cadastro da ONG (nome a confirmar) atualiza o `nome_instituicao`.
+2. `SELO_REVOGADO`, publicado pelo badge-service pela outbox quando um selo é revogado (ver `docs/saga.md`), altera o status para REVOGADO.
+3. `ORGANIZACAO_ATUALIZADA`, publicado pelo org-service quando o cadastro da ONG muda, atualiza o `nome_instituicao`.
 
 A atualização é idempotente: é um upsert pela chave `ong_id`, então receber o mesmo evento duas vezes produz o mesmo resultado. Se o projetor ficar fora do ar, a consulta continua respondendo com o último estado conhecido, e ele reprocessa os eventos pendentes quando voltar.
 

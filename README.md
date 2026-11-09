@@ -46,11 +46,11 @@ Democratizar o acesso à segurança da informação e à conformidade regulatór
 O **ONGSec** atua como um consultor de segurança automatizado e emissor de selos digitais de conformidade cibernética.
 
 **Exemplo Prático (Associação Cuidar):**
-1. **Diagnóstico Automatizado:** Dona Maria, diretora de um abrigo infantil, acessa o **Portal Web de Gestão** e responde a um questionário adaptado de higiene digital.
+1. **Diagnóstico Automatizado:** Dona Maria, diretora de um abrigo infantil, acessa o **Painel Web de Gestão** e responde a um questionário adaptado de higiene digital.
 2. **Plano de Ação Tático:** O sistema processa as vulnerabilidades e gera um plano de tarefas de remediação prioritárias.
 3. **Automação com IA (RAG + LangChain):** Ao executar a tarefa *"Elaborar Política de Privacidade"*, Dona Maria aciona o **Assistente IA**. O modelo recupera diretrizes oficiais da ANPD (RAG) e consulta as configurações reais da ONG no sistema via *tools* internas para gerar a política personalizada.
 4. **Validação e Selo Digital:** Após a resolução das pendências e atualização do *score*, o sistema aciona uma orquestração **SAGA** para emitir o Selo Digital de Conformidade.
-5. **Transparência Pública:** Semanas depois, um doador abre o **Portal Mobile** para validar a reputação digital da ONG. A consulta utiliza uma arquitetura **CQRS** otimizada para respostas instantâneas e não exige login.
+5. **Transparência Pública:** Semanas depois, um doador abre o **App/Portal Mobile Público** para validar a reputação digital da ONG. A consulta utiliza uma arquitetura **CQRS** otimizada para respostas instantâneas e não exige login.
 
 ---
 
@@ -62,9 +62,9 @@ O sistema utiliza o padrão de **Microsserviços com Database per Service** (cad
   <img src="docs/img/arquitetura-geral.png" alt="ONGSec - Arquitetura geral: dois clientes, API Gateway, dois BFFs, quatro servicos e CQRS" width="90%" />
 </p>
 
-*Cliente 1 (Portal Mobile, verde) consulta o selo sem login e cai no BFF Público, que lê só o modelo CQRS de leitura. Cliente 2 (Portal Web de Gestão, azul) entra com JWT; o gateway encaminha ao BFF Gestão, que agrega org-service, audit-service, task-service e a escrita do badge-service. A linha amarela pontilhada é a SAGA orquestrada (Audit → Task → Badge). Os dois lados do badge compartilham o PostgreSQL 4.*
+*Cliente 1 (App/Portal Mobile Público, verde) consulta o selo sem login e cai no BFF Público, que lê só o modelo CQRS de leitura. Cliente 2 (Painel Web de Gestão, azul) entra com JWT; o gateway encaminha ao BFF Gestão, que agrega org-service, audit-service, task-service e a escrita do badge-service. A linha amarela pontilhada é a SAGA orquestrada (Audit → Task → Badge). Os dois lados do badge compartilham o PostgreSQL 4.*
 
-A consulta pública de selo (`GET /api/publico/selos/{ongId}`) é anônima e protegida por *rate limiting* no gateway. As rotas do Portal Web de Gestão exigem JWT válido; requisição sem token ou com token expirado recebe `401` na borda e não chega aos microsserviços.
+A consulta pública de selo (`GET /api/publico/selos/{ongId}`) é anônima e protegida por *rate limiting* no gateway. As rotas do Painel Web de Gestão exigem JWT válido; requisição sem token ou com token expirado recebe `401` na borda e não chega aos microsserviços.
 
 | Microsserviço de Domínio | Responsabilidade Principal | Tecnologia de Banco de Dados | Justificativa Arquitetural |
 |---|---|---|---|
@@ -76,7 +76,7 @@ A consulta pública de selo (`GET /api/publico/selos/{ongId}`) é anônima e pro
 ## Padrões e Requisitos Transversais
 
 * **SAGA Orquestrada (Transação Distribuída):** O fluxo de Solicitação e Emissão de Selo cruza Audit → Task → Badge. Caminho feliz, falha e compensações estão em [`docs/saga.md`](docs/saga.md).
-* **CQRS:** O badge-service separa o modelo de escrita do modelo de consulta pública do Portal Mobile. O detalhe está em [`docs/cqrs.md`](docs/cqrs.md).
+* **CQRS:** O badge-service separa o modelo de escrita do modelo de consulta pública do App/Portal Mobile Público. O detalhe está em [`docs/cqrs.md`](docs/cqrs.md).
 * **Persistência:** um banco por serviço, consistência eventual, risco de *dual write* e o fluxo de *outbox* estão em [`docs/data-consistency.md`](docs/data-consistency.md).
 * **Inteligência Artificial:** Módulo de RAG alimentado por guias oficiais, integrado via LangChain com consulta a tools internas do sistema. Entra em execução na Parte 4; nesta etapa o fluxo já está previsto na história de uso.
 

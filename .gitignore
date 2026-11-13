@@ -1,1 +1,7 @@
 enunciado.txt
+.env
+*.db
+__pycache__/
+.venv/
+stub_local.py
+docker-compose.teste.yml

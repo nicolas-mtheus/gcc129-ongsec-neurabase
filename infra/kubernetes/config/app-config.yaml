@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ongsec-app-config
+  namespace: ongsec
+data:
+  APP_PORT: "8000"
+  ORG_SERVICE_URL: "http://org-service:80"
+  AUDIT_SERVICE_URL: "http://audit-service:80"
+  TASK_SERVICE_URL: "http://task-service:80"
+  BADGE_SERVICE_URL: "http://badge-service:80"
+  BFF_GESTAO_URL: "http://bff-gestao:80"
+  BFF_PUBLICO_URL: "http://bff-publico:80"
+  WEB_GESTAO_URL: "http://web-gestao:80"
+  ORG_DB_HOST: "org-db"
+  ORG_DB_PORT: "5432"
+  ORG_DB_NAME: "org_db"
+  ORG_DB_USER: "ongsec"
+  AUDIT_DB_HOST: "audit-db"
+  AUDIT_DB_PORT: "5432"
+  AUDIT_DB_NAME: "audit_db"
+  AUDIT_DB_USER: "ongsec"
+  TASK_DB_HOST: "task-db"
+  TASK_DB_PORT: "5432"
+  TASK_DB_NAME: "task_db"
+  TASK_DB_USER: "ongsec"
+  BADGE_DB_HOST: "badge-db"
+  BADGE_DB_PORT: "5432"
+  BADGE_DB_NAME: "badge_db"
+  BADGE_DB_USER: "ongsec"

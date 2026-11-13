@@ -19,7 +19,7 @@ function New-RandomSecretValue {
         $generator.Dispose()
     }
 
-    return [Convert]::ToBase64String($bytes)
+    return [BitConverter]::ToString($bytes).Replace("-", "").ToLowerInvariant()
 }
 
 function Apply-LocalSecret {

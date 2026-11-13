@@ -22,11 +22,16 @@ escutam na porta 80. No cluster, os Services das aplicacoes expõem a porta 80;
 use nomes DNS como `http://org-service:80` e `http://bff-publico:80` nas chamadas
 internas. As APIs recebem `GET /healthz`; o Painel Web usa `GET /` como probe.
 
-Os microsservicos devem ler `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER` e
-`DB_PASSWORD`. O badge-service tambem recebe `AUDIT_SERVICE_URL` e
-`TASK_SERVICE_URL`; os BFFs recebem as URLs dos microsservicos que consomem.
-`org-service`, `bff-gestao` e Gateway recebem `JWT_SECRET`. Endpoints internos e
-nomes de variaveis estao definidos em `config/app-config.yaml` e nos Deployments.
+Os quatro microsservicos recebem `DATABASE_URL`, montada a partir da senha do
+Secret e do nome DNS do proprio banco. O `badge-service` tambem recebe
+`AUDIT_SERVICE_URL`, `TASK_SERVICE_URL` e `ORG_SERVICE_URL`; os BFFs recebem as
+URLs dos microsservicos que consomem. `org-service` e `bff-gestao` recebem
+`JWT_SECRET`. Endpoints internos e nomes de variaveis estao definidos em
+`config/app-config.yaml` e nos Deployments.
+
+Para demonstrar a compensacao de falha da SAGA, envie `X-Simular-Falha: true` na
+requisicao de teste de emissao. Esse valor e um cabecalho HTTP por chamada; nao e
+uma variavel de ambiente nem deve ser colocado em ConfigMap/Secret.
 
 ## Subir o cluster
 

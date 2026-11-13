@@ -21,31 +21,13 @@ spec:
             - name: http
               containerPort: 8000
           env:
-            - name: DB_HOST
-              valueFrom:
-                configMapKeyRef:
-                  name: ongsec-app-config
-                  key: ORG_DB_HOST
-            - name: DB_PORT
-              valueFrom:
-                configMapKeyRef:
-                  name: ongsec-app-config
-                  key: ORG_DB_PORT
-            - name: DB_NAME
-              valueFrom:
-                configMapKeyRef:
-                  name: ongsec-app-config
-                  key: ORG_DB_NAME
-            - name: DB_USER
-              valueFrom:
-                configMapKeyRef:
-                  name: ongsec-app-config
-                  key: ORG_DB_USER
             - name: DB_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: org-db-credentials
                   key: DB_PASSWORD
+            - name: DATABASE_URL
+              value: "postgresql://ongsec:$(DB_PASSWORD)@org-db:5432/org_db"
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:
@@ -108,31 +90,13 @@ spec:
             - name: http
               containerPort: 8000
           env:
-            - name: DB_HOST
-              valueFrom:
-                configMapKeyRef:
-                  name: ongsec-app-config
-                  key: AUDIT_DB_HOST
-            - name: DB_PORT
-              valueFrom:
-                configMapKeyRef:
-                  name: ongsec-app-config
-                  key: AUDIT_DB_PORT
-            - name: DB_NAME
-              valueFrom:
-                configMapKeyRef:
-                  name: ongsec-app-config
-                  key: AUDIT_DB_NAME
-            - name: DB_USER
-              valueFrom:
-                configMapKeyRef:
-                  name: ongsec-app-config
-                  key: AUDIT_DB_USER
             - name: DB_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: audit-db-credentials
                   key: DB_PASSWORD
+            - name: DATABASE_URL
+              value: "postgresql://ongsec:$(DB_PASSWORD)@audit-db:5432/audit_db"
           readinessProbe:
             httpGet:
               path: /healthz
@@ -190,31 +154,13 @@ spec:
             - name: http
               containerPort: 8000
           env:
-            - name: DB_HOST
-              valueFrom:
-                configMapKeyRef:
-                  name: ongsec-app-config
-                  key: TASK_DB_HOST
-            - name: DB_PORT
-              valueFrom:
-                configMapKeyRef:
-                  name: ongsec-app-config
-                  key: TASK_DB_PORT
-            - name: DB_NAME
-              valueFrom:
-                configMapKeyRef:
-                  name: ongsec-app-config
-                  key: TASK_DB_NAME
-            - name: DB_USER
-              valueFrom:
-                configMapKeyRef:
-                  name: ongsec-app-config
-                  key: TASK_DB_USER
             - name: DB_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: task-db-credentials
                   key: DB_PASSWORD
+            - name: DATABASE_URL
+              value: "postgresql://ongsec:$(DB_PASSWORD)@task-db:5432/task_db"
           readinessProbe:
             httpGet:
               path: /healthz
@@ -272,31 +218,13 @@ spec:
             - name: http
               containerPort: 8000
           env:
-            - name: DB_HOST
-              valueFrom:
-                configMapKeyRef:
-                  name: ongsec-app-config
-                  key: BADGE_DB_HOST
-            - name: DB_PORT
-              valueFrom:
-                configMapKeyRef:
-                  name: ongsec-app-config
-                  key: BADGE_DB_PORT
-            - name: DB_NAME
-              valueFrom:
-                configMapKeyRef:
-                  name: ongsec-app-config
-                  key: BADGE_DB_NAME
-            - name: DB_USER
-              valueFrom:
-                configMapKeyRef:
-                  name: ongsec-app-config
-                  key: BADGE_DB_USER
             - name: DB_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: badge-db-credentials
                   key: DB_PASSWORD
+            - name: DATABASE_URL
+              value: "postgresql://ongsec:$(DB_PASSWORD)@badge-db:5432/badge_db"
             - name: AUDIT_SERVICE_URL
               valueFrom:
                 configMapKeyRef:
@@ -307,6 +235,11 @@ spec:
                 configMapKeyRef:
                   name: ongsec-app-config
                   key: TASK_SERVICE_URL
+            - name: ORG_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: ongsec-app-config
+                  key: ORG_SERVICE_URL
           readinessProbe:
             httpGet:
               path: /healthz

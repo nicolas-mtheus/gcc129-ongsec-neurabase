@@ -1,0 +1,77 @@
+services:
+  # API Gateway (Ponto único de entrada externo)
+  gateway:
+    build:
+      context: ../../gateway/nginx
+      dockerfile: Dockerfile
+    container_name: gateway
+    ports:
+      - "8080:80"
+    networks:
+      - edge
+    depends_on:
+      - bff-gestao
+      - bff-publico
+      - web-gestao
+    restart: unless-stopped
+
+  # Painel Web de Gestão (Servido internamente pelo Gateway em /gestao/)
+  web-gestao:
+    image: nginx:alpine
+    container_name: web-gestao
+    networks:
+      - edge
+    restart: unless-stopped
+
+  # BFF Gestão (Rotas protegidas por JWT em /api/gestao/*)
+  bff-gestao:
+    build:
+      context: ../../backend/bffs/gestao
+      dockerfile: Dockerfile
+    container_name: bff-gestao
+    networks:
+      - edge
+      - app
+    environment:
+      - JWT_SECRET_KEY=ongsec-secret-key-2026
+      - JWT_ALGORITHM=HS256
+      - MOCK_FALLBACK=true
+      - ORG_SERVICE_URL=http://org-service:8000
+      - AUDIT_SERVICE_URL=http://audit-service:8000
+      - TASK_SERVICE_URL=http://task-service:8000
+      - BADGE_SERVICE_URL=http://badge-service:8000
+    restart: unless-stopped
+
+  # BFF Público (Rotas de consulta anônima em /api/publico/*)
+  bff-publico:
+    build:
+      context: ../../backend/bffs/publico
+      dockerfile: Dockerfile
+    container_name: bff-publico
+    networks:
+      - edge
+      - app
+    environment:
+      - MOCK_FALLBACK=true
+      - BADGE_SERVICE_URL=http://badge-service:8000
+    restart: unless-stopped
+
+  # =========================================================================
+  # Serviços de Domínio e Bancos (Responsabilidade de Lucas e Tainara)
+  # Serão adicionados nas redes 'app' e suas respectivas redes de dados isoladas
+  # =========================================================================
+  # org-service:
+  #   ...
+  # audit-service:
+  #   ...
+  # task-service:
+  #   ...
+  # badge-service:
+  #   ...
+
+networks:
+  edge:
+    driver: bridge
+  app:
+    driver: bridge
+

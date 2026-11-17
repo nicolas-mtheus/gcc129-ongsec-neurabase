@@ -51,6 +51,11 @@ spec:
                 secretKeyRef:
                   name: ongsec-app-credentials
                   key: JWT_SECRET
+            - name: JWT_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ongsec-app-credentials
+                  key: JWT_SECRET
           readinessProbe:
             httpGet:
               path: /healthz
@@ -83,6 +88,9 @@ spec:
   ports:
     - name: http
       port: 80
+      targetPort: http
+    - name: http-app
+      port: 8000
       targetPort: http
 ---
 apiVersion: apps/v1
@@ -166,6 +174,9 @@ spec:
     - name: http
       port: 80
       targetPort: http
+    - name: http-app
+      port: 8000
+      targetPort: http
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -215,6 +226,8 @@ spec:
                 secretKeyRef:
                   name: task-db-credentials
                   key: DB_PASSWORD
+            - name: DATABASE_URL
+              value: "postgresql+psycopg2://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)"
           readinessProbe:
             httpGet:
               path: /healthz
@@ -247,6 +260,9 @@ spec:
   ports:
     - name: http
       port: 80
+      targetPort: http
+    - name: http-app
+      port: 8000
       targetPort: http
 ---
 apiVersion: apps/v1
@@ -297,6 +313,13 @@ spec:
                 secretKeyRef:
                   name: badge-db-credentials
                   key: DB_PASSWORD
+            - name: DATABASE_URL
+              value: "postgresql+psycopg2://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)"
+            - name: ORG_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: ongsec-app-config
+                  key: ORG_SERVICE_URL
             - name: AUDIT_SERVICE_URL
               valueFrom:
                 configMapKeyRef:
@@ -339,6 +362,9 @@ spec:
   ports:
     - name: http
       port: 80
+      targetPort: http
+    - name: http-app
+      port: 8000
       targetPort: http
 ---
 apiVersion: apps/v1
@@ -389,6 +415,11 @@ spec:
                 secretKeyRef:
                   name: ongsec-app-credentials
                   key: JWT_SECRET
+            - name: JWT_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ongsec-app-credentials
+                  key: JWT_SECRET
           readinessProbe:
             httpGet:
               path: /healthz
@@ -421,6 +452,9 @@ spec:
   ports:
     - name: http
       port: 80
+      targetPort: http
+    - name: http-app
+      port: 8000
       targetPort: http
 ---
 apiVersion: apps/v1
@@ -484,6 +518,9 @@ spec:
     - name: http
       port: 80
       targetPort: http
+    - name: http-app
+      port: 8000
+      targetPort: http
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -540,6 +577,9 @@ spec:
     - name: http
       port: 80
       targetPort: http
+    - name: http-app
+      port: 8000
+      targetPort: http
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -565,6 +605,11 @@ spec:
               containerPort: 80
           env:
             - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: ongsec-app-credentials
+                  key: JWT_SECRET
+            - name: JWT_SECRET_KEY
               valueFrom:
                 secretKeyRef:
                   name: ongsec-app-credentials
@@ -601,4 +646,7 @@ spec:
   ports:
     - name: http
       port: 80
+      targetPort: http
+    - name: http-app
+      port: 8000
       targetPort: http

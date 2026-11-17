@@ -38,7 +38,10 @@ minikube addons enable ingress
 minikube addons enable metrics-server
 kubectl apply -f infra/kubernetes/base/namespace.yaml
 kubectl apply -f infra/kubernetes/config/app-config.yaml
+# No Windows (PowerShell):
 powershell -ExecutionPolicy Bypass -File .\infra\kubernetes\config\create-local-secrets.ps1
+# No Linux/macOS (Bash):
+./infra/kubernetes/config/create-local-secrets.sh
 ```
 
 O script cria passwords aleatorias para cada banco e um segredo de JWT dentro do

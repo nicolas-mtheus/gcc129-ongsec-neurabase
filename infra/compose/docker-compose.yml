@@ -1,12 +1,14 @@
 services:
-  # API Gateway (Ponto único de entrada externo)
+  # =========================================================================
+  # 1. API Gateway (Borda - Ponto único de entrada externo)
+  # =========================================================================
   gateway:
     build:
       context: ../../gateway/nginx
       dockerfile: Dockerfile
     container_name: gateway
     ports:
-      - "8080:80"
+      - "${GATEWAY_PORT:-8080}:80"
     networks:
       - edge
     depends_on:
@@ -15,15 +17,21 @@ services:
       - web-gestao
     restart: unless-stopped
 
-  # Painel Web de Gestão (Servido internamente pelo Gateway em /gestao/)
+  # =========================================================================
+  # 2. Painel Web de Gestão (Frontend SPA - Servido em /gestao/)
+  # =========================================================================
   web-gestao:
-    image: nginx:alpine
+    build:
+      context: ../../frontend/web-gestao
+      dockerfile: Dockerfile
     container_name: web-gestao
     networks:
       - edge
     restart: unless-stopped
 
-  # BFF Gestão (Rotas protegidas por JWT em /api/gestao/*)
+  # =========================================================================
+  # 3. BFFs (Backend for Frontend)
+  # =========================================================================
   bff-gestao:
     build:
       context: ../../backend/bffs/gestao
@@ -33,16 +41,20 @@ services:
       - edge
       - app
     environment:
-      - JWT_SECRET_KEY=ongsec-secret-key-2026
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-ongsec-secret-key-2026}
       - JWT_ALGORITHM=HS256
       - MOCK_FALLBACK=true
       - ORG_SERVICE_URL=http://org-service:8000
       - AUDIT_SERVICE_URL=http://audit-service:8000
       - TASK_SERVICE_URL=http://task-service:8000
       - BADGE_SERVICE_URL=http://badge-service:8000
+    depends_on:
+      - org-service
+      - audit-service
+      - task-service
+      - badge-service
     restart: unless-stopped
 
-  # BFF Público (Rotas de consulta anônima em /api/publico/*)
   bff-publico:
     build:
       context: ../../backend/bffs/publico
@@ -54,24 +66,184 @@ services:
     environment:
       - MOCK_FALLBACK=true
       - BADGE_SERVICE_URL=http://badge-service:8000
+    depends_on:
+      - badge-service
     restart: unless-stopped
 
   # =========================================================================
-  # Serviços de Domínio e Bancos (Responsabilidade de Lucas e Tainara)
-  # Serão adicionados nas redes 'app' e suas respectivas redes de dados isoladas
+  # 4. Microsserviços de Domínio e seus respectivos bancos PostgreSQL
   # =========================================================================
-  # org-service:
-  #   ...
-  # audit-service:
-  #   ...
-  # task-service:
-  #   ...
-  # badge-service:
-  #   ...
 
+  # --- ORG-SERVICE & ORG-DB ---
+  org-db:
+    image: postgres:16-alpine
+    container_name: org-db
+    environment:
+      POSTGRES_USER: ongsec
+      POSTGRES_PASSWORD: ${LOCAL_DB_PASSWORD:-ongsec_local_dev}
+      POSTGRES_DB: org_db
+    volumes:
+      - org_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ongsec -d org_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+    networks:
+      - org-data
+    restart: unless-stopped
+
+  org-service:
+    build:
+      context: ../../backend/services/org-service
+      dockerfile: Dockerfile
+    container_name: org-service
+    environment:
+      - DATABASE_URL=postgresql+psycopg://ongsec:${LOCAL_DB_PASSWORD:-ongsec_local_dev}@org-db:5432/org_db
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-ongsec-secret-key-2026}
+      - JWT_ALGORITHM=HS256
+    depends_on:
+      org-db:
+        condition: service_healthy
+    networks:
+      - app
+      - org-data
+    restart: unless-stopped
+
+  # --- AUDIT-SERVICE & AUDIT-DB ---
+  audit-db:
+    image: postgres:16-alpine
+    container_name: audit-db
+    environment:
+      POSTGRES_USER: ongsec
+      POSTGRES_PASSWORD: ${LOCAL_DB_PASSWORD:-ongsec_local_dev}
+      POSTGRES_DB: audit_db
+    volumes:
+      - audit_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ongsec -d audit_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+    networks:
+      - audit-data
+    restart: unless-stopped
+
+  audit-service:
+    build:
+      context: ../../backend/services/audit-service
+      dockerfile: Dockerfile
+    container_name: audit-service
+    environment:
+      - DATABASE_URL=postgresql+psycopg://ongsec:${LOCAL_DB_PASSWORD:-ongsec_local_dev}@audit-db:5432/audit_db
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-ongsec-secret-key-2026}
+      - JWT_ALGORITHM=HS256
+    depends_on:
+      audit-db:
+        condition: service_healthy
+    networks:
+      - app
+      - audit-data
+    restart: unless-stopped
+
+  # --- TASK-SERVICE & TASK-DB ---
+  task-db:
+    image: postgres:16-alpine
+    container_name: task-db
+    environment:
+      POSTGRES_USER: ongsec
+      POSTGRES_PASSWORD: ${LOCAL_DB_PASSWORD:-ongsec_local_dev}
+      POSTGRES_DB: task_db
+    volumes:
+      - task_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ongsec -d task_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+    networks:
+      - task-data
+    restart: unless-stopped
+
+  task-service:
+    build:
+      context: ../../backend/services/task-service
+      dockerfile: Dockerfile
+    container_name: task-service
+    environment:
+      - DATABASE_URL=postgresql+psycopg2://ongsec:${LOCAL_DB_PASSWORD:-ongsec_local_dev}@task-db:5432/task_db
+      - SEED_DEMO=true
+    depends_on:
+      task-db:
+        condition: service_healthy
+    networks:
+      - app
+      - task-data
+    restart: unless-stopped
+
+  # --- BADGE-SERVICE & BADGE-DB ---
+  badge-db:
+    image: postgres:16-alpine
+    container_name: badge-db
+    environment:
+      POSTGRES_USER: ongsec
+      POSTGRES_PASSWORD: ${LOCAL_DB_PASSWORD:-ongsec_local_dev}
+      POSTGRES_DB: badge_db
+    volumes:
+      - badge_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ongsec -d badge_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+    networks:
+      - badge-data
+    restart: unless-stopped
+
+  badge-service:
+    build:
+      context: ../../backend/services/badge-service
+      dockerfile: Dockerfile
+    container_name: badge-service
+    environment:
+      - DATABASE_URL=postgresql+psycopg2://ongsec:${LOCAL_DB_PASSWORD:-ongsec_local_dev}@badge-db:5432/badge_db
+      - AUDIT_SERVICE_URL=http://audit-service:8000
+      - TASK_SERVICE_URL=http://task-service:8000
+      - ORG_SERVICE_URL=http://org-service:8000
+    depends_on:
+      badge-db:
+        condition: service_healthy
+      audit-service:
+        condition: service_started
+      task-service:
+        condition: service_started
+    networks:
+      - app
+      - badge-data
+    restart: unless-stopped
+
+# =========================================================================
+# Redes com isolamento entre camadas (Borda, Aplicação e Bancos Isolados)
+# =========================================================================
 networks:
   edge:
     driver: bridge
   app:
     driver: bridge
+  org-data:
+    internal: true
+  audit-data:
+    internal: true
+  task-data:
+    internal: true
+  badge-data:
+    internal: true
 
+# =========================================================================
+# Volumes persistentes para os quatro bancos de dados
+# =========================================================================
+volumes:
+  org_db_data: {}
+  audit_db_data: {}
+  task_db_data: {}
+  badge_db_data: {}

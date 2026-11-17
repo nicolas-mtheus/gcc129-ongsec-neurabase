@@ -20,9 +20,7 @@ app = FastAPI(title='ONGSec org-service', version='1.0.0')
 security = HTTPBearer(auto_error=False)
 password_hash = PasswordHash.recommended()
 JWT_ALGORITHM = os.getenv('JWT_ALGORITHM', 'HS256')
-JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY')
-if not JWT_SECRET_KEY:
-    raise RuntimeError('Defina JWT_SECRET_KEY no ambiente')
+JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY') or os.getenv('JWT_SECRET') or 'ongsec-secret-key-2026'
 revoked_tokens: set[str] = set()  # Apenas desenvolvimento; use armazenamento compartilhado em produção.
 
 
@@ -109,7 +107,37 @@ def find_org(db: Session, ong_id: str):
 
 @app.on_event('startup')
 def create_tables():
-    Base.metadata.create_all(bind=engine)
+    import time
+    for _ in range(30):
+        try:
+            Base.metadata.create_all(bind=engine)
+            break
+        except Exception:
+            time.sleep(2)
+    # Seed inicial demonstrativo
+    try:
+        with Session(engine) as s:
+            org = s.get(Organizacao, 'ong-123')
+            if not org:
+                old = s.scalar(select(Organizacao).where(Organizacao.cnpj == '12345678000199'))
+                if old and old.ong_id != 'ong-123':
+                    s.delete(old)
+                    s.commit()
+                org = Organizacao(ong_id='ong-123', nome_instituicao='Associação Cuidar',
+                                  cnpj='12345678000199', responsavel_legal='Maria da Silva',
+                                  email='maria@associacaocuidar.org')
+                s.add(org)
+                s.commit()
+
+            usr = s.scalar(select(Usuario).where(Usuario.email == 'maria@associacaocuidar.org'))
+            if not usr:
+                usr = Usuario(usuario_id='usr-1', ong_id='ong-123', nome='Maria da Silva',
+                              email='maria@associacaocuidar.org',
+                              senha_hash=password_hash.hash('senha-segura-123'))
+                s.add(usr)
+                s.commit()
+    except Exception as e:
+        pass
 
 
 @app.get('/healthz')

@@ -1,0 +1,10 @@
+{
+  "name": "web-gestao",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Painel Web de Gestao - ONGSec",
+  "scripts": {
+    "build": "mkdir -p dist && cp -r index.html style.css app.js dist/"
+  }
+}
+

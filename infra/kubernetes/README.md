@@ -115,15 +115,17 @@ precisa do metrics-server; confira `kubectl top pods -n ongsec`. Para demonstrar
 o aumento para tres replicas sem depender de carga de CPU, ajuste
 temporariamente o minimo do HPA:
 
+No PowerShell 5.1 as aspas duplas do JSON somem ao chamar o `kubectl` e o retorno e `invalid JSON patch`. Escape as aspas:
+
 ```powershell
-kubectl -n ongsec patch hpa bff-publico --type merge -p '{"spec":{"minReplicas":3}}'
+kubectl -n ongsec patch hpa bff-publico --type merge -p '{\"spec\":{\"minReplicas\":3}}'
 kubectl -n ongsec get pods -l app.kubernetes.io/name=bff-publico -w
 ```
 
 Depois da demonstracao, restaure a escala minima definida no manifest:
 
 ```powershell
-kubectl -n ongsec patch hpa bff-publico --type merge -p '{"spec":{"minReplicas":1}}'
+kubectl -n ongsec patch hpa bff-publico --type merge -p '{\"spec\":{\"minReplicas\":1}}'
 ```
 
 Para demonstrar o HPA reagindo a CPU, gerem carga de teste controlada e observem

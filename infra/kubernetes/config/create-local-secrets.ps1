@@ -4,10 +4,20 @@ if (-not (Get-Command kubectl -ErrorAction SilentlyContinue)) {
     throw "kubectl was not found. Install kubectl and configure the local cluster first."
 }
 
-& kubectl get namespace ongsec *> $null
+$namespaceResources = @(& kubectl get namespaces -o name)
 if ($LASTEXITCODE -ne 0) {
+    throw "Failed to list Kubernetes namespaces."
+}
+if ($namespaceResources -notcontains "namespace/ongsec") {
     throw "Namespace 'ongsec' does not exist. Apply base/namespace.yaml first."
 }
+
+$secretResources = @(& kubectl get secrets --namespace ongsec -o name)
+if ($LASTEXITCODE -ne 0) {
+    throw "Failed to list Secrets in namespace 'ongsec'."
+}
+
+$existingSecretNames = @($secretResources | ForEach-Object { "$_".Trim() })
 
 function New-RandomSecretValue {
     $bytes = New-Object byte[] 24
@@ -19,7 +29,7 @@ function New-RandomSecretValue {
         $generator.Dispose()
     }
 
-    return [Convert]::ToBase64String($bytes)
+    return [BitConverter]::ToString($bytes).Replace("-", "").ToLowerInvariant()
 }
 
 function Apply-LocalSecret {
@@ -28,8 +38,8 @@ function Apply-LocalSecret {
         [Parameter(Mandatory = $true)][hashtable]$Values
     )
 
-    & kubectl get secret $Name --namespace ongsec *> $null
-    if ($LASTEXITCODE -eq 0) {
+    if ($existingSecretNames -contains "secret/$Name") {
+        Write-Host "Secret '$Name' already exists. Skipping."
         return
     }
 
@@ -53,6 +63,8 @@ $($encodedValues -join "`n")
     if ($LASTEXITCODE -ne 0) {
         throw "Failed to apply Secret '$Name'."
     }
+
+    Write-Host "Secret '$Name' created."
 }
 
 foreach ($service in @("org", "audit", "task", "badge")) {
@@ -67,4 +79,4 @@ Apply-LocalSecret -Name "ongsec-app-credentials" -Values @{
     JWT_SECRET = New-RandomSecretValue
 }
 
-Write-Host "Created local database and application Secrets in namespace 'ongsec'."
+Write-Host "Local database and application Secrets are ready in namespace 'ongsec'."

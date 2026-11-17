@@ -15,7 +15,7 @@ from pydantic import BaseModel, EmailStr, Field
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger("bff-gestao")
 
-JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "ongsec-secret-key-2026")
+JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY") or os.getenv("JWT_SECRET", "ongsec-secret-key-2026")
 JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 MOCK_FALLBACK = os.getenv("MOCK_FALLBACK", "true").lower() in ("true", "1", "yes")
 

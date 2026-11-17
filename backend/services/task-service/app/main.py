@@ -10,7 +10,18 @@ from sqlalchemy import DateTime, ForeignKey, String, create_engine, func, select
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
 # ---------- Configuração (vem de variáveis de ambiente) ----------
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./task.db")
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    db_user = os.getenv("DB_USER", "ongsec")
+    db_pass = os.getenv("DB_PASSWORD", "ongsec_local_dev")
+    db_host = os.getenv("DB_HOST")
+    db_port = os.getenv("DB_PORT", "5432")
+    db_name = os.getenv("DB_NAME", "task_db")
+    if db_host:
+        DATABASE_URL = f"postgresql+psycopg2://{db_user}:{db_pass}@{db_host}:{db_port}/{db_name}"
+    else:
+        DATABASE_URL = "sqlite:///./task.db"
+
 SEED_DEMO = os.getenv("SEED_DEMO", "true").lower() == "true"
 
 engine = create_engine(DATABASE_URL, pool_pre_ping=True)
@@ -77,6 +88,16 @@ def iniciar():
             time.sleep(2)
     else:
         raise RuntimeError("Banco de dados indisponível")
+
+    try:
+        with Session(engine) as s:
+            if not s.scalar(select(Plano).where(Plano.ong_id == 'ong-123')):
+                plano = Plano(plano_id='plano-1', ong_id='ong-123', diagnostico_id='diag-55',
+                              idempotency_key='seed-plano')
+                s.add(plano)
+                s.commit()
+    except Exception:
+        pass
     if SEED_DEMO:  # dados de exemplo (Associação Cuidar) para a demonstração
         with Session(engine) as s:
             if not s.get(Plano, "plano-1"):

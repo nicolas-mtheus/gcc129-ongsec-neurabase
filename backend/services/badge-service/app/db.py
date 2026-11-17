@@ -5,7 +5,18 @@ from datetime import datetime, timezone
 from sqlalchemy import JSON, String, create_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./badge.db")
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    db_user = os.getenv("DB_USER", "ongsec")
+    db_pass = os.getenv("DB_PASSWORD", "ongsec_local_dev")
+    db_host = os.getenv("DB_HOST")
+    db_port = os.getenv("DB_PORT", "5432")
+    db_name = os.getenv("DB_NAME", "badge_db")
+    if db_host:
+        DATABASE_URL = f"postgresql+psycopg2://{db_user}:{db_pass}@{db_host}:{db_port}/{db_name}"
+    else:
+        DATABASE_URL = "sqlite:///./badge.db"
+
 engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 
 

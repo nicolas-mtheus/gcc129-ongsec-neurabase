@@ -4,9 +4,11 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Status-Em%20Desenvolvimento-blue?style=for-the-badge" alt="Status">
+  <img src="https://img.shields.io/badge/Status-Parte%203%20Conclu%C3%ADda-success?style=for-the-badge" alt="Status">
   <img src="https://img.shields.io/badge/UFLA-GCC129%20Sistemas%20Distribu%C3%ADdos-red?style=for-the-badge" alt="UFLA">
   <img src="https://img.shields.io/badge/LGPD-Conformidade-success?style=for-the-badge" alt="LGPD">
+  <img src="https://img.shields.io/badge/Docker-Compose%20v2-blue?style=for-the-badge&logo=docker" alt="Docker">
+  <img src="https://img.shields.io/badge/Kubernetes-Orquestra%C3%A7%C3%A3o-326ce5?style=for-the-badge&logo=kubernetes" alt="Kubernetes">
 </p>
 
 <h3 align="center">
@@ -23,6 +25,30 @@
 | :---: | :---: | :---: | :---: |
 
 </div>
+
+---
+
+## 🚀 Execução Rápida do Sistema Completo (Parte 3)
+
+Com a entrega da **Parte 3 (Containerização e Orquestração)**, a plataforma inteira sobe localmente com um **único comando**, orquestrando **12 containers** (Gateway, 2 BFFs, Frontend Web, 4 microsserviços de domínio e 4 bancos PostgreSQL independentes):
+
+```bash
+# Na raiz do repositório:
+docker compose -f infra/compose/docker-compose.yml up --build -d
+```
+
+### 🌐 Endereços de Acesso (Única Porta Exposta: 8080)
+
+| Recurso | URL | Descrição |
+|---|---|---|
+| **Painel Web de Gestão** | [`http://localhost:8080/gestao/`](http://localhost:8080/gestao/) | Interface SPA com métricas, visualizador SAGA, HATEOAS e simulador |
+| **Healthcheck de Borda** | [`http://localhost:8080/healthz`](http://localhost:8080/healthz) | Verificação de integridade do Nginx Gateway (HTTP 200) |
+| **Consulta Pública de Selo** | [`http://localhost:8080/api/publico/selos/ong-123`](http://localhost:8080/api/publico/selos/ong-123) | Rota anônima via BFF Público (CQRS de leitura) |
+
+#### 🔑 Credenciais para Demonstração no Painel Web
+- **E-mail:** `maria@associacaocuidar.org`
+- **Senha:** `senha-segura-123`
+*(No painel há o botão "⚡ Usar Gestor Demo" para preenchimento com 1 clique).*
 
 ---
 
@@ -54,48 +80,78 @@ O **ONGSec** atua como um consultor de segurança automatizado e emissor de selo
 
 ---
 
-## Esboço da Arquitetura Distribuída
+## Arquitetura Distribuída & Entregas da Parte 3
 
-O sistema utiliza o padrão de **Microsserviços com Database per Service** (cada serviço possui sua própria instância isolada de banco de dados). Há dois clientes com necessidades diferentes, e o tráfego externo entra sempre pelo API Gateway antes do BFF correspondente. As fronteiras dos quatro serviços estão em [`docs/microservicos.md`](docs/microservicos.md). O detalhamento de rotas, responsabilidades e a diferença entre as respostas dos BFFs está em [`docs/gateway-bffs.md`](docs/gateway-bffs.md).
+O sistema utiliza o padrão de **Microsserviços com Database per Service** (cada serviço possui sua própria instância isolada de banco de dados). O tráfego externo entra sempre pelo API Gateway antes de alcançar o BFF correspondente.
 
 <p align="center">
   <img src="docs/img/arquitetura-geral.png" alt="ONGSec - Arquitetura geral: dois clientes, API Gateway, dois BFFs, quatro servicos e CQRS" width="90%" />
 </p>
 
-*Cliente 1 (App/Portal Mobile Público, verde) consulta o selo sem login e cai no BFF Público, que lê só o modelo CQRS de leitura. Cliente 2 (Painel Web de Gestão, azul) entra com JWT; o gateway encaminha ao BFF Gestão, que agrega org-service, audit-service, task-service e a escrita do badge-service. A linha amarela pontilhada é a SAGA orquestrada (Audit → Task → Badge). Os dois lados do badge compartilham o PostgreSQL 4.*
+### 🐳 1. Docker e Dockerfiles Customizados
+- **Dockerfile próprio para cada serviço:** Nenhum serviço utiliza imagens prontas de terceiros sem customização.
+- **Multi-Stage Build no Frontend (`frontend/web-gestao/Dockerfile`):**
+  - **Estágio 1 (Builder):** Ambiente Node.js Alpine para montagem dos artefatos estáticos.
+  - **Estágio 2 (Produção):** Nginx Alpine mínimo servindo apenas `/dist`.
+  - **Ganho Arquitetural:** Redução superior a 90% no tamanho da imagem final (~300MB para ~25MB), eliminação de ferramentas de build em runtime e mitigação de vulnerabilidades.
+- **Serviços Backend em Python:** Imagens baseadas em `python:3.11-slim`, dependências instaladas com `--no-cache-dir`, sem privilégios desnecessários.
 
-A consulta pública de selo (`GET /api/publico/selos/{ongId}`) é anônima e protegida por *rate limiting* no gateway. As rotas do Painel Web de Gestão exigem JWT válido; requisição sem token ou com token expirado recebe `401` na borda e não chega aos microsserviços.
+### 🔌 2. API Gateway e BFFs (Backend-for-Frontend)
+- **API Gateway (Nginx):**
+  - Porta 8080 mapeada para a porta 80 do container. Única porta HTTP publicada pelo Compose.
+  - Roteamento reverso inteligente: `/gestao/` para o frontend, `/api/gestao/*` para o BFF Gestão e `/api/publico/*` para o BFF Público.
+  - Verificação de saúde de borda na rota `GET /healthz`.
+  - Rate limiting e rastreabilidade distribuída via header `X-Correlation-ID`.
+- **BFF Gestão (`bff-gestao`):** Porta interna 8000. Exige JWT em rotas protegidas, valida credenciais com Argon2 no `org-db`, agrega múltiplos serviços e injeta controles hipermidiáticos HATEOAS.
+- **BFF Público (`bff-publico`):** Porta interna 8000. Consulta anônima de selos via CQRS otimizado para cidadãos e doadores.
 
-| Microsserviço de Domínio | Responsabilidade Principal | Tecnologia de Banco de Dados | Justificativa Arquitetural |
-|---|---|---|---|
-| 1. Entidades (org-service) | Gestão de cadastros de ONGs, usuários, perfis e autenticação. | PostgreSQL (Instância 1) | Garantia ACID para dados estruturados de contas e acessos. |
-| 2. Auditoria (audit-service) | Diagnósticos de segurança, checklists dinâmicos e cálculo de risco. | PostgreSQL (Instância 2) | Uso de colunas JSONB nativas para suportar esquemas flexíveis de questionários. |
-| 3. Remediação (task-service) | Ciclo de vida do plano de ação (tarefas, prazos e soluções). | PostgreSQL (Instância 3) | Controle estrito de estados e relacionamentos de tarefas. |
-| 4. Certificação (badge-service) | Emissão, validação e publicação de Selos Digitais de Conformidade. | PostgreSQL (Instância 4) | Separação CQRS mantendo consistência e leitura otimizada no modelo relacional. |
+### 💾 3. Persistência e Isolamento de Redes (Compose)
+- **4 Volumes Nomeados:** `org-data`, `audit-data`, `task-data` e `badge-data`, assegurando persistência durável dos bancos PostgreSQL 16.
+- **6 Redes Definidas com Isolamento Estrito:**
+  - `edge-network`: Conecta Gateway aos BFFs e Frontend Web.
+  - `app-network`: Conecta BFFs aos microsserviços de domínio.
+  - `org-data-network`, `audit-data-network`, `task-data-network`, `badge-data-network`: Redes privadas exclusivas entre cada microsserviço e seu respectivo PostgreSQL, garantindo que nenhum serviço acerte diretamente o banco alheio.
+
+### ☸️ 4. Orquestração em Kubernetes (`infra/kubernetes/`)
+- **Deployments & Services:** Manifestos declarativos com réplicas, `livenessProbe` e `readinessProbe` baseados em `/healthz`. Services com ClusterIP e mapeamento dual-port (80 e 8000).
+- **Ingress Controller:** Roteamento de borda unificado em [`infra/kubernetes/networking/ingress.yaml`](infra/kubernetes/networking/ingress.yaml).
+- **ConfigMaps e Secrets:** Variáveis públicas centralizadas em [`infra/kubernetes/config/app-config.yaml`](infra/kubernetes/config/app-config.yaml) e credenciais protegidas via Kubernetes Secrets geradas pelo script [`infra/kubernetes/config/create-local-secrets.sh`](infra/kubernetes/config/create-local-secrets.sh).
+- **Demonstração de Escalabilidade:** Suporte a escalabilidade horizontal via HPA ([`infra/kubernetes/workloads/bff-publico-hpa.yaml`](infra/kubernetes/workloads/bff-publico-hpa.yaml)) ou sob demanda via `kubectl scale deployment bff-publico -n ongsec --replicas=3`.
+
+---
 
 ## Padrões e Requisitos Transversais
 
-* **SAGA Orquestrada (Transação Distribuída):** O fluxo de Solicitação e Emissão de Selo cruza Audit → Task → Badge. Caminho feliz, falha e compensações estão em [`docs/saga.md`](docs/saga.md).
-* **CQRS:** O badge-service separa o modelo de escrita do modelo de consulta pública do App/Portal Mobile Público. O detalhe está em [`docs/cqrs.md`](docs/cqrs.md).
-* **Persistência:** um banco por serviço, consistência eventual, risco de *dual write* e o fluxo de *outbox* estão em [`docs/data-consistency.md`](docs/data-consistency.md).
-* **Inteligência Artificial:** Módulo de RAG alimentado por guias oficiais, integrado via LangChain com consulta a tools internas do sistema. Entra em execução na Parte 4; nesta etapa o fluxo já está previsto na história de uso.
+* **SAGA Orquestrada (Transação Distribuída):** O fluxo de Solicitação e Emissão de Selo cruza Audit → Task → Badge. Detalhes em [`docs/saga.md`](docs/saga.md).
+* **CQRS:** O badge-service separa o modelo de escrita do modelo de consulta pública. Detalhes em [`docs/cqrs.md`](docs/cqrs.md).
+* **Persistência:** Database-per-service e outbox detalhados em [`docs/data-consistency.md`](docs/data-consistency.md).
+* **Inteligência Artificial:** Módulo de RAG alimentado por guias oficiais, integrado via LangChain com consulta a tools internas do sistema (previsto para a Parte 4).
 
-## Documentação da Parte 2
+---
 
-| Documento | Conteúdo |
-|---|---|
-| [`docs/img/arquitetura-geral.png`](docs/img/arquitetura-geral.png) | Diagrama geral usado na apresentação |
-| [`docs/microservicos.md`](docs/microservicos.md) | Quatro serviços, fronteiras, cortes recusados e diagrama de comunicação |
-| [`docs/saga.md`](docs/saga.md) | SAGA orquestrada: passos, compensações, caminho feliz e falha |
-| [`docs/gateway-bffs.md`](docs/gateway-bffs.md) | API Gateway, dois BFFs e comparativo de respostas |
-| [`docs/api/versionamento.md`](docs/api/versionamento.md) | Versionamento `/v1`, verbos HTTP, status e HATEOAS |
-| [`docs/openapi/org-service.yaml`](docs/openapi/org-service.yaml) | Contrato REST do org-service |
-| [`docs/openapi/audit-service.yaml`](docs/openapi/audit-service.yaml) | Contrato REST do audit-service |
-| [`docs/openapi/task-service.yaml`](docs/openapi/task-service.yaml) | Contrato REST do task-service (HATEOAS em `Tarefa`) |
-| [`docs/openapi/badge-service.yaml`](docs/openapi/badge-service.yaml) | Contrato REST do badge-service (HATEOAS em `SolicitacaoSelo`) |
-| [`docs/api/alinhamento-bff.md`](docs/api/alinhamento-bff.md) | Conferência dos contratos com os JSON dos BFFs |
-| [`docs/data-consistency.md`](docs/data-consistency.md) | Database per service, consistência eventual e outbox |
-| [`docs/cqrs.md`](docs/cqrs.md) | Modelos de escrita e leitura do badge-service |
+## Estrutura do Repositório
+
+```text
+├── backend/
+│   ├── bffs/
+│   │   ├── gestao/         # BFF Gestão (FastAPI + JWT + HATEOAS)
+│   │   └── publico/        # BFF Público (FastAPI + CQRS Leitura)
+│   └── services/
+│       ├── org-service/    # Gestão de Entidades e Usuários
+│       ├── audit-service/  # Diagnósticos e Auditoria LGPD
+│       ├── task-service/   # Remediação e Tarefas
+│       └── badge-service/  # Emissão e Validação de Selos
+├── frontend/
+│   └── web-gestao/         # Painel Web SPA (Multi-stage build Docker)
+├── gateway/
+│   └── nginx/              # API Gateway Nginx (Borda porta 8080)
+├── infra/
+│   ├── compose/            # docker-compose.yml (12 containers, 6 redes, 4 volumes)
+│   └── kubernetes/         # Manifests K8s (Deployments, Services, Ingress, HPA, Secrets)
+└── docs/                   # Documentação arquitetural completa
+```
+
+---
 
 ## Fundamentação e Referências
 
@@ -103,29 +159,3 @@ A consulta pública de selo (`GET /api/publico/selos/{ongId}`) é anônima e pro
 * CERT.br (Centro de Estudos, Resposta e Tratamento de Incidentes de Segurança no Brasil): Cartilha de Segurança para a Internet. São Paulo: NIC.br, 2023.
 * CIS (Center for Internet Security): CIS Critical Security Controls Version 8 — Implementation Group 1 (IG1). CIS, 2021.
 * SEBRAE: Guia Prático de Adequação à LGPD para Micro e Pequenas Empresas. Serviço Brasileiro de Apoio às Micro e Pequenas Empresas, 2022.
-
-## Instruções para execução local
-
-A Parte 2 entrega a arquitetura documentada. Não há sistema em execução nesta etapa: Docker e Kubernetes ficam para as Partes 3 e 4, quando um terceiro conseguirá subir o ambiente com um único comando.
-
-### Pré-requisitos
-
-* Git
-* Navegador ou editor capaz de abrir Markdown
-* Um visualizador OpenAPI, por exemplo o [Swagger Editor](https://editor.swagger.io/), para os arquivos em `docs/openapi/`
-
-### Passo a passo
-
-```bash
-git clone https://github.com/nicolas-mtheus/gcc129-ongsec-neurabase.git
-cd gcc129-ongsec-neurabase
-```
-
-1. Leia este README para o problema, os integrantes e o diagrama geral da arquitetura.
-2. Leia [`docs/microservicos.md`](docs/microservicos.md) para as responsabilidades, as fronteiras e o diagrama de comunicação.
-3. Leia [`docs/saga.md`](docs/saga.md) para a emissão do selo, as compensações e os dois diagramas de sequência.
-4. Leia [`docs/gateway-bffs.md`](docs/gateway-bffs.md) para o API Gateway, os dois BFFs e o comparativo de respostas.
-5. Leia [`docs/api/versionamento.md`](docs/api/versionamento.md) e os contratos em `docs/openapi/`. A conferência com os JSON dos BFFs está em [`docs/api/alinhamento-bff.md`](docs/api/alinhamento-bff.md).
-6. Leia [`docs/data-consistency.md`](docs/data-consistency.md) e [`docs/cqrs.md`](docs/cqrs.md) para persistência e o modelo de leitura do selo.
-
-Não existe `docker-compose.yml` no repositório nesta fase. Qualquer instrução de `docker-compose up` antes da Parte 3 estaria incorreta.

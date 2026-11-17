@@ -25,6 +25,27 @@ def erro(status: int, titulo: str, detalhe: str, request: Request) -> JSONRespon
 @app.on_event("startup")
 def iniciar():
     criar_tabelas()
+    try:
+        with Session(engine) as s:
+            if not s.get(SeloPublico, 'ong-123'):
+                sol = Solicitacao(solicitacao_id='sol-998', ong_id='ong-123', diagnostico_id='diag-55',
+                                  plano_id='plano-1', estado='SELO_EMITIDO', id_selo='CERT-2026-998',
+                                  historico=[
+                                      {"evento": "DIAGNOSTICO_CONCLUIDO", "servico": "audit-service", "sucesso": True},
+                                      {"evento": "TAREFAS_REMEDIADAS", "servico": "task-service", "sucesso": True},
+                                      {"evento": "SELO_GERADO", "servico": "badge-service", "sucesso": True}
+                                  ])
+                s.add(sol)
+                selo = Selo(id_selo='CERT-2026-998', ong_id='ong-123', solicitacao_id='sol-998',
+                            status='ATIVO', emitido_em='2026-10-10T14:00:00Z')
+                s.add(selo)
+                pub = SeloPublico(ong_id='ong-123', id_selo='CERT-2026-998', nome_instituicao='Associação Cuidar',
+                                  status_conformidade='ATIVO', emitido_em='2026-10-10T14:00:00Z',
+                                  mensagem='Instituição verificada e em conformidade com as diretrizes da LGPD.')
+                s.add(pub)
+                s.commit()
+    except Exception:
+        pass
 
 
 def solicitacao_json(sol: Solicitacao) -> dict:

@@ -1,0 +1,58 @@
+# Ambiente isolado de desenvolvimento dos serviços de Lucas.
+# Execute a partir da raiz do repositório com -f infra/compose/lucas-local.yml.
+services:
+  org-db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ongsec
+      POSTGRES_PASSWORD: ${LOCAL_DB_PASSWORD:-ongsec_local_dev}
+      POSTGRES_DB: orgdb
+    volumes:
+      - lucas_org_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ongsec -d orgdb"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+    networks: [org-data]
+  audit-db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ongsec
+      POSTGRES_PASSWORD: ${LOCAL_DB_PASSWORD:-ongsec_local_dev}
+      POSTGRES_DB: auditdb
+    volumes:
+      - lucas_audit_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ongsec -d auditdb"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+    networks: [audit-data]
+  org-service:
+    build: ../../backend/services/org-service
+    ports: ["127.0.0.1:8001:8000"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://ongsec:${LOCAL_DB_PASSWORD:-ongsec_local_dev}@org-db:5432/orgdb
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?Defina JWT_SECRET_KEY no ambiente}
+      JWT_ALGORITHM: HS256
+    depends_on:
+      org-db: {condition: service_healthy}
+    networks: [app, org-data]
+  audit-service:
+    build: ../../backend/services/audit-service
+    ports: ["127.0.0.1:8002:8000"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://ongsec:${LOCAL_DB_PASSWORD:-ongsec_local_dev}@audit-db:5432/auditdb
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?Defina JWT_SECRET_KEY no ambiente}
+      JWT_ALGORITHM: HS256
+    depends_on:
+      audit-db: {condition: service_healthy}
+    networks: [app, audit-data]
+networks:
+  app: {}
+  org-data: {internal: true}
+  audit-data: {internal: true}
+volumes:
+  lucas_org_data: {}
+  lucas_audit_data: {}

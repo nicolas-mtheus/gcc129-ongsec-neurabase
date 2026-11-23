@@ -69,7 +69,11 @@
         </button>
         <button class="tab-btn" data-tab="tab-architecture">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect><rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></svg>
-          Topologia da Solução
+          Topologia & Bancos
+        </button>
+        <button class="tab-btn" data-tab="tab-ai">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a4 4 0 0 1 4 4v2h2a2 2 0 0 1 2 2v6a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4v-6a2 2 0 0 1 2-2h2V6a4 4 0 0 1 4-4z"></path><circle cx="9" cy="13" r="1"></circle><circle cx="15" cy="13" r="1"></circle></svg>
+          Assistente IA (RAG + LangChain)
         </button>
       </div>
     </nav>
@@ -277,8 +281,30 @@
       <section class="tab-pane" id="tab-saga">
         <div class="toolbar">
           <div class="toolbar-title">
-            <h2>Transação Distribuída — Padrão SAGA</h2>
-            <span class="toolbar-subtitle">Rastreabilidade ponta a ponta dos eventos entre os microsserviços de domínio</span>
+            <h2>Transação Distribuída — Padrão SAGA Orquestrada</h2>
+            <span class="toolbar-subtitle">Execução ao vivo via <code>saga-orchestrator</code>: caminho feliz e falha com compensação</span>
+          </div>
+          <div class="toolbar-actions" style="flex-wrap: wrap;">
+            <button id="btnSagaSucesso" class="btn btn-primary" title="Executa a SAGA em caminho feliz e emite selo ATIVO">
+              ✅ Executar SAGA (Caminho Feliz)
+            </button>
+            <button id="btnSagaFalha" class="btn btn-danger-outline" title="Provoca falha no badge-service e aciona compensação no task-service">
+              💥 Provocar Falha na SAGA (Compensar)
+            </button>
+            <button id="btnConcluirTarefas" class="btn btn-outline" title="Conclui tarefas reabertas pela compensação">
+              🔧 Concluir Tarefas Reabertas
+            </button>
+          </div>
+        </div>
+
+        <!-- Live Tasks State (task-service) -->
+        <div class="card" style="margin-bottom: 1.25rem;">
+          <div class="card-title-bar">
+            <h3>Estado das Tarefas no <code>task-service</code> (<code>task-db</code>)</h3>
+            <span class="badge-count" id="sagaPlanoBadge">plano-1 • 0 pendentes</span>
+          </div>
+          <div id="tarefasPlanoBox" class="tasks-live-grid">
+            <span style="color: var(--text-dim); font-size: 0.85rem;">Faça login para inspecionar as tarefas do plano-1.</span>
           </div>
         </div>
 
@@ -421,7 +447,22 @@
         <div class="toolbar">
           <div class="toolbar-title">
             <h2>Arquitetura de Microsserviços & Isolamento de Redes</h2>
-            <span class="toolbar-subtitle">12 Containers orquestrados com separação estrita de camadas e persistência</span>
+            <span class="toolbar-subtitle">14 Containers orquestrados com Orquestrador SAGA dedicado, Serviço de IA e Database-per-Service</span>
+          </div>
+          <div class="toolbar-actions">
+            <button id="btnEvidenciaBancos" class="btn btn-primary">
+              🗄️ Inspecionar Bancos Isolados ao Vivo
+            </button>
+          </div>
+        </div>
+
+        <div class="card" style="margin-bottom: 1.25rem;">
+          <div class="card-title-bar">
+            <h3>Evidência ao Vivo — Bancos Separados por Serviço (<code>Database per Service</code>)</h3>
+            <span class="badge-tag">4 PostgreSQL + Orquestrador</span>
+          </div>
+          <div id="bancosEvidenciaGrid" class="db-evidence-grid">
+            <span style="color: var(--text-dim); font-size: 0.85rem;">Clique em "Inspecionar Bancos Isolados ao Vivo" para consultar cada instância em tempo real.</span>
           </div>
         </div>
 
@@ -493,6 +534,101 @@
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 5: ASSISTENTE IA (RAG + LANGCHAIN + RESILIÊNCIA) -->
+      <section class="tab-pane" id="tab-ai">
+        <div class="toolbar">
+          <div class="toolbar-title">
+            <h2>Consultor LGPD com IA (Ollama DeepHat + RAG + LangChain)</h2>
+            <span class="toolbar-subtitle">Base vetorial própria (ANPD, CERT.br, CIS IG1, SEBRAE), Tools reais e resiliência distribuída</span>
+          </div>
+          <div class="toolbar-actions" style="flex-wrap: wrap;">
+            <button id="btnIaMetricas" class="btn btn-outline">📊 Atualizar Métricas</button>
+            <button id="btnIaSimularFalha" class="btn btn-danger-outline">⚡ Simular Falha LLM (Fallback + CB)</button>
+            <button id="btnIaResetCb" class="btn btn-outline">🔄 Resetar Circuit Breaker</button>
+          </div>
+        </div>
+
+        <div class="ai-telemetry-bar" id="aiTelemetryBar">
+          <div class="ai-pill"><span>Provedor:</span> <strong id="aiModeloTag">deephat:latest (Ollama)</strong></div>
+          <div class="ai-pill"><span>Circuit Breaker:</span> <strong id="aiCbEstado">CLOSED</strong></div>
+          <div class="ai-pill"><span>Modo:</span> <strong id="aiModoTag">—</strong></div>
+          <div class="ai-pill"><span>Latência:</span> <strong id="aiLatenciaTag">—</strong></div>
+          <div class="ai-pill"><span>Cache Hits:</span> <strong id="aiCacheTag">0</strong></div>
+        </div>
+
+        <div class="card" style="margin-bottom: 1.25rem;">
+          <div class="ai-controls-grid">
+            <div class="form-field">
+              <label for="aiPresetSelect">Perguntas Prontas (Avaliação RAG & Caso Real):</label>
+              <select id="aiPresetSelect" class="ai-select">
+                <option value="Segundo a Resolução CD/ANPD nº 2/2022, uma ONG de pequeno porte precisa indicar um Encarregado (DPO) formal ou basta um canal de comunicação?">Q1 — Dispensa de DPO pela ANPD (ATPP)</option>
+                <option value="Quais itens obrigatórios a Política de Privacidade da Associação Cuidar deve conter para tratar dados de crianças e adolescentes?">Q2 — Política de Privacidade para Abrigo Infantil (Art. 14)</option>
+                <option value="Qual é a política de backup recomendada pela cartilha CERT.br e como devemos tratar planilhas de beneficiários enviadas por WhatsApp?">Q3 — Regra de Backup 3-2-1 e WhatsApp (CERT.br)</option>
+                <option value="Em quanto tempo devemos revogar as credenciais de ex-voluntários segundo o CIS Controls v8 IG1?">Q4 — Revogação de Credenciais de Voluntários (CIS IG1)</option>
+                <option value="Qual o score mínimo e a condição das tarefas no ONGSec para emitir o selo, e o que acontece com o score se a SAGA precisar compensar?">Q5 — Regras de Certificação ONGSec e SAGA</option>
+                <option value="Analise a situação atual da Associação Cuidar nos sistemas internos e redija uma minuta curta de Política de Privacidade personalizada para a ONG.">Tarefa Real — Gerar Política de Privacidade da Associação Cuidar</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label for="aiPerguntaInput">Pergunta / Solicitação ao Consultor IA:</label>
+              <textarea id="aiPerguntaInput" rows="2" class="ai-textarea">Segundo a Resolução CD/ANPD nº 2/2022, uma ONG de pequeno porte precisa indicar um Encarregado (DPO) formal ou basta um canal de comunicação?</textarea>
+            </div>
+            <div class="ai-action-row">
+              <label class="ai-check"><input type="checkbox" id="aiUsarRag" checked> Usar RAG (Base Vetorial)</label>
+              <label class="ai-check"><input type="checkbox" id="aiUsarCache" checked> Usar Cache</label>
+              <button id="btnIaConsultar" class="btn btn-primary">🤖 Consultar Assistente IA</button>
+              <button id="btnIaComparar" class="btn btn-outline">⚖️ Comparar COM RAG vs. SEM RAG</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="aiRespostaContainer" class="ai-results-grid" style="display: none;">
+          <div class="card">
+            <div class="card-title-bar">
+              <h3>Resposta do Consultor IA (LangChain Chain)</h3>
+              <span class="badge-tag" id="aiModoBadge">OLLAMA</span>
+            </div>
+            <div id="aiRespostaTexto" class="ai-response-text"></div>
+          </div>
+
+          <div class="card">
+            <div class="card-title-bar">
+              <h3>LangChain Tools & Chunks Recuperados (RAG)</h3>
+              <span class="badge-count" id="aiChunksCount">0 chunks</span>
+            </div>
+            <div id="aiToolsResumo" class="ai-subpanel"></div>
+            <div id="aiRagResumo" class="ai-subpanel"></div>
+          </div>
+        </div>
+
+        <div id="aiComparacaoContainer" class="card" style="display: none; margin-top: 1.25rem;">
+          <div class="card-title-bar">
+            <h3>Comparativo Qualitativo: COM RAG vs. SEM RAG</h3>
+            <span class="badge-tag">Avaliação Experimental</span>
+          </div>
+          <div class="ai-compare-grid">
+            <div class="ai-compare-col">
+              <h4>✅ COM Recuperação (RAG + Base Normativa)</h4>
+              <div id="aiCompComRag" class="ai-response-text"></div>
+            </div>
+            <div class="ai-compare-col">
+              <h4>⚠️ SEM Recuperação (Apenas Conhecimento Base do Modelo)</h4>
+              <div id="aiCompSemRag" class="ai-response-text"></div>
+            </div>
+          </div>
+        </div>
+
+        <div id="aiMetricasContainer" class="card" style="margin-top: 1.25rem;">
+          <div class="card-title-bar">
+            <h3>Telemetria Distribuída: Latência Medida & Estimativa de Custo em Escala</h3>
+            <span class="badge-tag">Observabilidade LLM</span>
+          </div>
+          <div id="aiMetricasBox" class="ai-metrics-box">
+            <span style="color: var(--text-dim); font-size: 0.85rem;">Clique em "Atualizar Métricas" ou faça uma consulta para registrar latências reais.</span>
           </div>
         </div>
       </section>

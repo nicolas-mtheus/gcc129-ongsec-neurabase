@@ -102,11 +102,15 @@ def iniciar():
         with Session(engine) as s:
             if not s.get(Plano, "plano-1"):
                 s.add(Plano(plano_id="plano-1", ong_id="ong-123", diagnostico_id="diag-55"))
+            if not s.get(Tarefa, "tarefa-1"):
                 s.add(Tarefa(tarefa_id="tarefa-1", plano_id="plano-1", ong_id="ong-123",
-                             titulo="Elaborar política de privacidade", prazo="2026-12-01"))
+                             titulo="Elaborar política de privacidade", prazo="2026-12-01",
+                             status="CONCLUIDA"))
+            if not s.get(Tarefa, "tarefa-2"):
                 s.add(Tarefa(tarefa_id="tarefa-2", plano_id="plano-1", ong_id="ong-123",
-                             titulo="Ativar autenticação em dois fatores", prazo="2026-12-10"))
-                s.commit()
+                             titulo="Ativar autenticação em dois fatores", prazo="2026-12-10",
+                             status="CONCLUIDA"))
+            s.commit()
 
 
 # ---------- Funções auxiliares ----------
@@ -186,6 +190,21 @@ def reabrir_plano(plano_id: str, request: Request):
         return plano_json(s, p)
 
 
+@app.post("/v1/planos/{plano_id}/conclusao")
+def concluir_plano(plano_id: str, request: Request):
+    # Conclui todas as tarefas pendentes/reabertas do plano
+    with Session(engine) as s:
+        p = s.get(Plano, plano_id)
+        if not p:
+            return erro(404, "Plano não encontrado", plano_id, request)
+        for t in s.scalars(select(Tarefa).where(
+            Tarefa.plano_id == plano_id, Tarefa.status.in_(["PENDENTE", "REABERTA"])
+        )).all():
+            t.status = "CONCLUIDA"
+        s.commit()
+        return plano_json(s, p)
+
+
 @app.get("/v1/organizacoes/{ong_id}/plano-atual")
 def plano_atual(ong_id: str, request: Request):
     with Session(engine) as s:
@@ -194,6 +213,20 @@ def plano_atual(ong_id: str, request: Request):
         if not p:
             return erro(404, "Plano não encontrado", ong_id, request)
         return plano_json(s, p)
+
+
+@app.get("/v1/organizacoes/{ong_id}/tarefas")
+def listar_tarefas_organizacao(ong_id: str, request: Request):
+    with Session(engine) as s:
+        p = s.scalars(select(Plano).where(Plano.ong_id == ong_id)
+                      .order_by(Plano.criado_em.desc())).first()
+        if not p:
+            return erro(404, "Plano não encontrado", ong_id, request)
+        ts = s.scalars(select(Tarefa).where(Tarefa.plano_id == p.plano_id)).all()
+        return {
+            **plano_json(s, p),
+            "tarefas": [tarefa_json(t) for t in ts],
+        }
 
 
 @app.get("/v1/tarefas/{tarefa_id}")

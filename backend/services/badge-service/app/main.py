@@ -189,6 +189,25 @@ def revogar(id_selo: str, request: Request, x_correlation_id: str | None = Heade
         return selo_json(s.get(Selo, id_selo))
 
 
+@app.post("/v1/organizacoes/{ong_id}/revogacao")
+def revogar_por_organizacao(ong_id: str, request: Request, x_correlation_id: str | None = Header(default=None)):
+    with Session(engine) as s:
+        selo = s.scalars(
+            select(Selo).where(Selo.ong_id == ong_id).order_by(Selo.emitido_em.desc())
+        ).first()
+        if not selo:
+            return erro(404, "Selo não encontrado para a organização", ong_id, request)
+        if selo.status == "REVOGADO":
+            return erro(409, "Conflito de estado", "O selo já está revogado", request)
+        id_selo = selo.id_selo
+        selo.status = "REVOGADO"
+        registrar_evento(s, "SELO_REVOGADO", selo.ong_id, {"id_selo": id_selo}, x_correlation_id)
+        s.commit()
+    processar_outbox()
+    with Session(engine) as s:
+        return selo_json(s.get(Selo, id_selo))
+
+
 @app.get("/v1/selos/{id_selo}")
 def obter_selo(id_selo: str, request: Request):
     with Session(engine) as s:

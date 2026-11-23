@@ -24,6 +24,7 @@ AUDIT_SERVICE_URL = os.getenv("AUDIT_SERVICE_URL", "http://audit-service:8000")
 TASK_SERVICE_URL = os.getenv("TASK_SERVICE_URL", "http://task-service:8000")
 BADGE_SERVICE_URL = os.getenv("BADGE_SERVICE_URL", "http://badge-service:8000")
 SAGA_ORCHESTRATOR_URL = os.getenv("SAGA_ORCHESTRATOR_URL", "http://saga-orchestrator:8000")
+AI_SERVICE_URL = os.getenv("AI_SERVICE_URL", "http://ai-service:8000")
 
 app = FastAPI(
     title="ONGSec BFF Gestão",
@@ -225,24 +226,40 @@ async def obter_detalhes_selo(ong_id: str, request: Request, user: Dict[str, Any
         except Exception:
             return None
 
-    badge_data, audit_data, org_data, task_data = await asyncio.gather(
-        fetch_badge(), fetch_audit(), fetch_org(), fetch_task()
+    async def fetch_saga():
+        try:
+            async with httpx.AsyncClient(timeout=3.0) as client:
+                r = await client.get(f"{SAGA_ORCHESTRATOR_URL}/v1/organizacoes/{ong_id}/ultima-solicitacao", headers=headers)
+                return r.json() if r.status_code == 200 else None
+        except Exception:
+            return None
+
+    badge_data, audit_data, org_data, task_data, saga_data = await asyncio.gather(
+        fetch_badge(), fetch_audit(), fetch_org(), fetch_task(), fetch_saga()
     )
 
     # Se todos os serviços responderam, monta os dados agregados
     if badge_data and audit_data and org_data and task_data:
-        # Extrai score de auditoria do diagnóstico CONCLUIDO
         score = 92
         if isinstance(audit_data, list) and len(audit_data) > 0:
             score = audit_data[0].get("score", 92)
         elif isinstance(audit_data, dict):
-            score = audit_data.get("score", 92)
+            itens = audit_data.get("itens")
+            if isinstance(itens, list) and len(itens) > 0:
+                score = itens[0].get("score", 92)
+            else:
+                score = audit_data.get("score", 92)
 
         tarefas_pendentes = 0
         if isinstance(task_data, dict):
             tarefas_pendentes = task_data.get("tarefas_pendentes", 0)
 
         responsavel = org_data.get("responsavel_legal", "Maria da Silva")
+        historico_saga = (
+            saga_data.get("historico_saga_emissao")
+            if isinstance(saga_data, dict) and saga_data.get("historico_saga_emissao")
+            else badge_data.get("historico_saga_emissao", [])
+        )
 
         return {
             "id_selo": badge_data.get("id_selo", "CERT-2026-998"),
@@ -252,7 +269,7 @@ async def obter_detalhes_selo(ong_id: str, request: Request, user: Dict[str, Any
                 "ong_id": ong_id,
                 "responsavel_legal": responsavel
             },
-            "historico_saga_emissao": badge_data.get("historico_saga_emissao", []),
+            "historico_saga_emissao": historico_saga,
             "tarefas_pendentes": tarefas_pendentes,
             "_links": {
                 "self": {
@@ -368,11 +385,13 @@ async def revogar_selo(ong_id: str, request: Request, user: Dict[str, Any] = Dep
     try:
         async with httpx.AsyncClient(timeout=3.0) as client:
             resp = await client.post(
-                f"{BADGE_SERVICE_URL}/v1/selos/CERT-2026-998/revogacao",
+                f"{BADGE_SERVICE_URL}/v1/organizacoes/{ong_id}/revogacao",
                 headers=headers
             )
             if resp.status_code in (200, 204):
                 return resp.json() if resp.content else {"status": "REVOGADO"}
+            if resp.status_code in (404, 409):
+                raise HTTPException(status_code=resp.status_code, detail=resp.json().get("detail", "Conflito ao revogar"))
     except httpx.RequestError:
         pass
 
@@ -385,6 +404,150 @@ async def revogar_selo(ong_id: str, request: Request, user: Dict[str, Any] = Dep
             "revogado_em": datetime.datetime.now(datetime.timezone.utc).isoformat()
         }
     raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="badge-service indisponível")
+
+
+# =========================================================================
+# Parte 4 — Orquestração SAGA ao vivo, Tarefas, Evidência de Bancos e IA
+# =========================================================================
+
+class ExecucaoSagaRequest(BaseModel):
+    simular_falha: bool = False
+    diagnostico_id: str = "diag-55"
+    plano_id: str = "plano-1"
+
+
+class ConsultoriaIARequest(BaseModel):
+    ong_id: str = "ong-123"
+    pergunta: str
+    usar_rag: bool = True
+    usar_cache: bool = True
+    simular_falha_llm: bool = False
+
+
+class CompararRagRequest(BaseModel):
+    ong_id: str = "ong-123"
+    pergunta: str
+
+
+class CircuitBreakerRequest(BaseModel):
+    acao: str  # abrir | fechar | limpar_cache
+
+
+@app.post("/api/gestao/saga/{ong_id}/executar", tags=["SAGA Orquestrada"])
+async def executar_saga_ao_vivo(ong_id: str, body: ExecucaoSagaRequest, request: Request, user: Dict[str, Any] = Depends(require_jwt)):
+    corr_id = getattr(request.state, "correlation_id", str(uuid.uuid4()))
+    headers = {
+        "X-Correlation-ID": corr_id,
+        "Idempotency-Key": request.headers.get("Idempotency-Key", str(uuid.uuid4())),
+        "X-Simular-Falha": "true" if body.simular_falha else "false",
+    }
+    try:
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            resp = await client.post(
+                f"{SAGA_ORCHESTRATOR_URL}/v1/solicitacoes",
+                json={"ong_id": ong_id, "diagnostico_id": body.diagnostico_id, "plano_id": body.plano_id},
+                headers=headers,
+            )
+            if resp.status_code in (200, 202):
+                return JSONResponse(status_code=resp.status_code, content=resp.json())
+            detail = resp.json().get("detail", "Falha na SAGA") if resp.content else "Falha na SAGA"
+            raise HTTPException(status_code=resp.status_code, detail=detail)
+    except httpx.RequestError as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=f"saga-orchestrator indisponível: {exc}")
+
+
+@app.get("/api/gestao/tarefas/{ong_id}", tags=["Tarefas"])
+async def listar_tarefas_ong(ong_id: str, request: Request, user: Dict[str, Any] = Depends(require_jwt)):
+    corr_id = getattr(request.state, "correlation_id", str(uuid.uuid4()))
+    try:
+        async with httpx.AsyncClient(timeout=4.0) as client:
+            resp = await client.get(f"{TASK_SERVICE_URL}/v1/organizacoes/{ong_id}/tarefas", headers={"X-Correlation-ID": corr_id})
+            if resp.status_code == 200:
+                return resp.json()
+            raise HTTPException(status_code=resp.status_code, detail="Erro ao buscar tarefas")
+    except httpx.RequestError as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=f"task-service indisponível: {exc}")
+
+
+@app.post("/api/gestao/tarefas/{ong_id}/concluir-todas", tags=["Tarefas"])
+async def concluir_todas_tarefas(ong_id: str, request: Request, user: Dict[str, Any] = Depends(require_jwt)):
+    corr_id = getattr(request.state, "correlation_id", str(uuid.uuid4()))
+    try:
+        async with httpx.AsyncClient(timeout=4.0) as client:
+            plano_resp = await client.get(f"{TASK_SERVICE_URL}/v1/organizacoes/{ong_id}/plano-atual", headers={"X-Correlation-ID": corr_id})
+            plano_id = plano_resp.json().get("plano_id", "plano-1") if plano_resp.status_code == 200 else "plano-1"
+            resp = await client.post(f"{TASK_SERVICE_URL}/v1/planos/{plano_id}/conclusao", headers={"X-Correlation-ID": corr_id})
+            if resp.status_code == 200:
+                return resp.json()
+            raise HTTPException(status_code=resp.status_code, detail="Erro ao concluir plano")
+    except httpx.RequestError as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=f"task-service indisponível: {exc}")
+
+
+@app.get("/api/gestao/evidencia-bancos", tags=["Observabilidade"])
+async def evidencia_bancos_separados(request: Request, ong_id: str = "ong-123", user: Dict[str, Any] = Depends(require_jwt)):
+    corr_id = getattr(request.state, "correlation_id", str(uuid.uuid4()))
+    headers = {"X-Correlation-ID": corr_id, "Authorization": request.headers.get("Authorization", "")}
+
+    async def consultar(nome: str, url: str):
+        try:
+            async with httpx.AsyncClient(timeout=4.0) as client:
+                r = await client.get(url, headers=headers)
+                return {"status": r.status_code, "dados": r.json() if r.content else None}
+        except Exception as e:
+            return {"status": 503, "erro": str(e)}
+
+    org_r, audit_r, task_r, badge_w_r, badge_cqrs_r, saga_r = await asyncio.gather(
+        consultar("org-db", f"{ORG_SERVICE_URL}/v1/organizacoes/{ong_id}"),
+        consultar("audit-db", f"{AUDIT_SERVICE_URL}/v1/organizacoes/{ong_id}/diagnosticos"),
+        consultar("task-db", f"{TASK_SERVICE_URL}/v1/organizacoes/{ong_id}/tarefas"),
+        consultar("badge-db (Escrita)", f"{BADGE_SERVICE_URL}/v1/organizacoes/{ong_id}/certificacao"),
+        consultar("badge-db (CQRS Leitura)", f"{BADGE_SERVICE_URL}/v1/consulta/organizacoes/{ong_id}"),
+        consultar("saga-orchestrator", f"{SAGA_ORCHESTRATOR_URL}/v1/organizacoes/{ong_id}/ultima-solicitacao"),
+    )
+    return {
+        "ong_id": ong_id,
+        "padrao": "Database per Service (4 instâncias PostgreSQL em redes privadas isoladas + Orquestrador SAGA dedicado)",
+        "bancos": [
+            {"banco": "org-db", "rede_isolada": "org-data", "servico": "org-service", **org_r},
+            {"banco": "audit-db", "rede_isolada": "audit-data", "servico": "audit-service", **audit_r},
+            {"banco": "task-db", "rede_isolada": "task-data", "servico": "task-service", **task_r},
+            {"banco": "badge-db (Modelo Escrita)", "rede_isolada": "badge-data", "servico": "badge-service", **badge_w_r},
+            {"banco": "badge-db (Projeção CQRS Leitura)", "rede_isolada": "badge-data", "servico": "badge-service", **badge_cqrs_r},
+            {"banco": "saga_orchestrator.db", "rede_isolada": "app", "servico": "saga-orchestrator", **saga_r},
+        ],
+    }
+
+
+async def _proxy_ai(method: str, path: str, request: Request, body: dict | None = None):
+    corr_id = getattr(request.state, "correlation_id", str(uuid.uuid4()))
+    headers = {"X-Correlation-ID": corr_id, "Authorization": request.headers.get("Authorization", "")}
+    try:
+        async with httpx.AsyncClient(timeout=130.0) as client:
+            r = await client.request(method, f"{AI_SERVICE_URL}{path}", headers=headers, json=body)
+            return JSONResponse(status_code=r.status_code, content=r.json() if r.content else {})
+    except httpx.RequestError as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=f"ai-service indisponível: {exc}")
+
+
+@app.post("/api/gestao/ia/consultoria", tags=["Assistente IA (RAG + LangChain)"])
+async def ia_consultoria(body: ConsultoriaIARequest, request: Request, user: Dict[str, Any] = Depends(require_jwt)):
+    return await _proxy_ai("POST", "/v1/ia/consultoria", request, body.model_dump())
+
+
+@app.post("/api/gestao/ia/comparar-rag", tags=["Assistente IA (RAG + LangChain)"])
+async def ia_comparar_rag(body: CompararRagRequest, request: Request, user: Dict[str, Any] = Depends(require_jwt)):
+    return await _proxy_ai("POST", "/v1/ia/comparar-rag", request, body.model_dump())
+
+
+@app.get("/api/gestao/ia/metricas", tags=["Assistente IA (RAG + LangChain)"])
+async def ia_metricas(request: Request, user: Dict[str, Any] = Depends(require_jwt)):
+    return await _proxy_ai("GET", "/v1/ia/metricas", request)
+
+
+@app.post("/api/gestao/ia/circuit-breaker", tags=["Assistente IA (RAG + LangChain)"])
+async def ia_circuit_breaker(body: CircuitBreakerRequest, request: Request, user: Dict[str, Any] = Depends(require_jwt)):
+    return await _proxy_ai("POST", "/v1/ia/circuit-breaker", request, body.model_dump())
 
 if __name__ == "__main__":
     import uvicorn

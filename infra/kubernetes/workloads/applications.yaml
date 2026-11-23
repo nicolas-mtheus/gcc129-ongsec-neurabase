@@ -395,6 +395,16 @@ spec:
                 configMapKeyRef:
                   name: ongsec-app-config
                   key: BADGE_SERVICE_URL
+            - name: SAGA_ORCHESTRATOR_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: ongsec-app-config
+                  key: SAGA_ORCHESTRATOR_URL
+            - name: AI_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: ongsec-app-config
+                  key: AI_SERVICE_URL
           readinessProbe:
             httpGet:
               path: /healthz
@@ -424,6 +434,101 @@ spec:
   type: ClusterIP
   selector:
     app.kubernetes.io/name: saga-orchestrator
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+    - name: http-app
+      port: 8000
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-service
+  namespace: ongsec
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ai-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ai-service
+    spec:
+      containers:
+        - name: ai-service
+          image: ongsec/ai-service:dev
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8000
+          env:
+            - name: OLLAMA_BASE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: ongsec-app-config
+                  key: OLLAMA_BASE_URL
+            - name: OLLAMA_MODEL
+              valueFrom:
+                configMapKeyRef:
+                  name: ongsec-app-config
+                  key: OLLAMA_MODEL
+            - name: ORG_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: ongsec-app-config
+                  key: ORG_SERVICE_URL
+            - name: AUDIT_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: ongsec-app-config
+                  key: AUDIT_SERVICE_URL
+            - name: TASK_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: ongsec-app-config
+                  key: TASK_SERVICE_URL
+            - name: BADGE_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: ongsec-app-config
+                  key: BADGE_SERVICE_URL
+            - name: JWT_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ongsec-app-credentials
+                  key: JWT_SECRET
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ai-service
+  namespace: ongsec
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: ai-service
   ports:
     - name: http
       port: 80
@@ -475,6 +580,16 @@ spec:
                 configMapKeyRef:
                   name: ongsec-app-config
                   key: BADGE_SERVICE_URL
+            - name: SAGA_ORCHESTRATOR_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: ongsec-app-config
+                  key: SAGA_ORCHESTRATOR_URL
+            - name: AI_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: ongsec-app-config
+                  key: AI_SERVICE_URL
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:
@@ -550,6 +665,16 @@ spec:
                 configMapKeyRef:
                   name: ongsec-app-config
                   key: BADGE_SERVICE_URL
+            - name: SAGA_ORCHESTRATOR_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: ongsec-app-config
+                  key: SAGA_ORCHESTRATOR_URL
+            - name: AI_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: ongsec-app-config
+                  key: AI_SERVICE_URL
           readinessProbe:
             httpGet:
               path: /healthz

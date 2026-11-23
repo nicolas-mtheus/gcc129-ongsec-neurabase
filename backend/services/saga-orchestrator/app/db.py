@@ -26,8 +26,8 @@ class SolicitacaoSaga(Base):
     id_selo: Mapped[str | None] = mapped_column(String(50), nullable=True)
     idempotency_key: Mapped[str | None] = mapped_column(String(100), unique=True, nullable=True)
     historico: Mapped[list] = mapped_column(JSON, default=list)
+    criado_em: Mapped[str] = mapped_column(String(40), default=agora)
 
 
 def criar_tabelas():
     Base.metadata.create_all(engine)
-

@@ -49,12 +49,14 @@ services:
       - TASK_SERVICE_URL=http://task-service:8000
       - BADGE_SERVICE_URL=http://badge-service:8000
       - SAGA_ORCHESTRATOR_URL=http://saga-orchestrator:8000
+      - AI_SERVICE_URL=http://ai-service:8000
     depends_on:
       - org-service
       - audit-service
       - task-service
       - badge-service
       - saga-orchestrator
+      - ai-service
     restart: unless-stopped
 
   bff-publico:
@@ -224,6 +226,33 @@ services:
       dockerfile: Dockerfile
     container_name: saga-orchestrator
     environment:
+      - ORG_SERVICE_URL=http://org-service:8000
+      - AUDIT_SERVICE_URL=http://audit-service:8000
+      - TASK_SERVICE_URL=http://task-service:8000
+      - BADGE_SERVICE_URL=http://badge-service:8000
+    depends_on:
+      - org-service
+      - audit-service
+      - task-service
+      - badge-service
+    networks:
+      - app
+    restart: unless-stopped
+
+  # --- AI-SERVICE (RAG + LangChain + Ollama DeepHat + Resiliência Distribuída) ---
+  ai-service:
+    build:
+      context: ../../backend/services/ai-service
+      dockerfile: Dockerfile
+    container_name: ai-service
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-deephat:latest}
+      - LLM_TIMEOUT_SECONDS=${LLM_TIMEOUT_SECONDS:-60}
+      - LLM_MAX_RETRIES=${LLM_MAX_RETRIES:-2}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-ongsec-secret-key-2026}
       - ORG_SERVICE_URL=http://org-service:8000
       - AUDIT_SERVICE_URL=http://audit-service:8000
       - TASK_SERVICE_URL=http://task-service:8000

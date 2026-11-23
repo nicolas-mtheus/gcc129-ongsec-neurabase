@@ -4,11 +4,11 @@ A transação de negócio é a **emissão do Selo Digital de Conformidade**. Ela
 
 O exemplo usado em todo o repositório é a Associação Cuidar (`ong-123`), diagnóstico `diag-55`, plano `plano-1`, solicitação `sol-998` e selo `CERT-2026-998`.
 
-## 1. Orquestrada, não coreografada
+## 1. Orquestrada em serviço dedicado, não coreografada
 
-Adotamos **uma única variante: SAGA orquestrada**. O orquestrador mora no **badge-service**.
+Adotamos **uma única variante: SAGA orquestrada** por um **serviço dedicado (`saga-orchestrator`)**, separado dos quatro microsserviços de domínio (`org-service`, `audit-service`, `task-service` e `badge-service`).
 
-Esse serviço já é o dono da solicitação (`POST /v1/solicitacoes` responde `202`), já guarda `historico_saga_emissao` e já expõe `POST /v1/solicitacoes/{id}/compensacoes`. Colocar a coordenação nele evita um quinto microsserviço só para orquestrar.
+Manter a orquestração fora do `badge-service` evita misturar coordenação distribuída com lógica de domínio (emissão/revogação de selos e projeção CQRS). O `saga-orchestrator` recebe `POST /v1/solicitacoes` (responde `202`), consulta `audit-service` e `task-service`, aciona `POST /v1/selos` no `badge-service`, guarda `historico_saga_emissao` e expõe `POST /v1/solicitacoes/{id}/compensacoes`.
 
 A alternativa **coreografada** foi recusada. Nela, cada serviço publicaria um evento e o próximo reagiria sozinho: `DIAGNOSTICO_CONCLUIDO` dispararia o task-service, `TAREFAS_REMEDIADAS` dispararia o badge-service. Isso espalha a ordem dos passos, torna a compensação implícita e impede um único `GET /v1/solicitacoes/{id}` de responder “em que ponto a emissão parou”. A certificação é um fluxo linear, com dependência clara (não se emite selo com tarefa pendente) e com um gestor esperando o resultado. Orquestração deixa timeout, `Idempotency-Key` e a ordem inversa das compensações no mesmo lugar.
 

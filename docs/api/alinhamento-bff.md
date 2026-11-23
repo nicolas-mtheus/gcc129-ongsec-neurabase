@@ -95,7 +95,7 @@ O navegador não recebe `href` de `http://badge-service`. O BFF Gestão reescrev
 
 No domínio, o HATEOAS está em dois recursos:
 
-- `GET /v1/tarefas/tar-77` no task-service, com `self`, `plano`, `concluir` e `reabrir`
-- `GET /v1/solicitacoes/sol-998` no badge-service, com `self`, `consulta_publica`, `certificacao` e `revogar`
+- `GET /v1/tarefas/tar-77` no `task-service`, com `self`, `plano`, `concluir` e `reabrir`
+- `GET /v1/solicitacoes/sol-998` no `saga-orchestrator`, com `self`, `consulta_publica`, `certificacao` e `revogar`
 
 `revogar.href` na solicitação (`/v1/selos/CERT-2026-998/revogacao`, método `POST`) é o que o BFF publica como `revogar_selo`. O identificador do caminho externo é `ong-123` porque o cliente do painel conhece a ONG, não o id interno do selo. O BFF faz essa tradução.

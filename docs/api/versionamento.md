@@ -6,6 +6,7 @@ Contrato normativo de cada serviço:
 
 | Serviço | Contrato |
 |---|---|
+| saga-orchestrator | [`docs/openapi/saga-orchestrator.yaml`](../openapi/saga-orchestrator.yaml) |
 | org-service | [`docs/openapi/org-service.yaml`](../openapi/org-service.yaml) |
 | audit-service | [`docs/openapi/audit-service.yaml`](../openapi/audit-service.yaml) |
 | task-service | [`docs/openapi/task-service.yaml`](../openapi/task-service.yaml) |
@@ -73,7 +74,7 @@ Todos os serviços usam a mesma tabela. O corpo de erro é `application/problem+
 Dois recursos carregam `_links` de navegação:
 
 - `Tarefa` no task-service (`self`, `plano`, `concluir`, `reabrir`)
-- `SolicitacaoSelo` no badge-service (`self`, `consulta_publica`, `certificacao`, `revogar`)
+- `SolicitacaoSelo` no `saga-orchestrator` (`self`, `consulta_publica`, `certificacao`, `revogar`)
 
 O `href` aponta para o serviço que executa a ação, com o `/v1` incluso. O BFF Gestão não repassa esses `href` crus ao navegador. Ele monta os links do gateway já documentados (`/api/gestao/...`). O mapa está no documento de alinhamento. Assim o cliente externo não recebe endereço interno do cluster, e o recurso de domínio continua navegável para o BFF.
 

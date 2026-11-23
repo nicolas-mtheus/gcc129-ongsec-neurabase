@@ -9,6 +9,7 @@ data:
   AUDIT_SERVICE_URL: "http://audit-service:80"
   TASK_SERVICE_URL: "http://task-service:80"
   BADGE_SERVICE_URL: "http://badge-service:80"
+  SAGA_ORCHESTRATOR_URL: "http://saga-orchestrator:80"
   BFF_GESTAO_URL: "http://bff-gestao:80"
   BFF_PUBLICO_URL: "http://bff-publico:80"
   WEB_GESTAO_URL: "http://web-gestao:80"

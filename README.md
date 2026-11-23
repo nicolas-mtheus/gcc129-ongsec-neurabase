@@ -30,7 +30,7 @@
 
 ## 🚀 Execução Rápida do Sistema Completo (Parte 3)
 
-Com a entrega da **Parte 3 (Containerização e Orquestração)**, a plataforma inteira sobe localmente com um **único comando**, orquestrando **12 containers** (Gateway, 2 BFFs, Frontend Web, 4 microsserviços de domínio e 4 bancos PostgreSQL independentes):
+Com a entrega da **Parte 3 (Containerização e Orquestração)**, a plataforma inteira sobe localmente com um **único comando**, orquestrando **13 containers** (Gateway, 2 BFFs, Frontend Web, Orquestrador SAGA dedicado, 4 microsserviços de domínio e 4 bancos PostgreSQL independentes):
 
 ```bash
 # Na raiz do repositório:
@@ -84,9 +84,7 @@ O **ONGSec** atua como um consultor de segurança automatizado e emissor de selo
 
 O sistema utiliza o padrão de **Microsserviços com Database per Service** (cada serviço possui sua própria instância isolada de banco de dados). O tráfego externo entra sempre pelo API Gateway antes de alcançar o BFF correspondente.
 
-<p align="center">
-  <img src="docs/img/arquitetura-geral.png" alt="ONGSec - Arquitetura geral: dois clientes, API Gateway, dois BFFs, quatro servicos e CQRS" width="90%" />
-</p>
+![ONGSec - Arquitetura geral: dois clientes, API Gateway, dois BFFs, orquestrador SAGA dedicado, quatro servicos e bancos isolados](docs/img/arquitetura-geral.png)
 
 ### 🐳 1. Docker e Dockerfiles Customizados
 - **Dockerfile próprio para cada serviço:** Nenhum serviço utiliza imagens prontas de terceiros sem customização.
@@ -122,10 +120,41 @@ O sistema utiliza o padrão de **Microsserviços com Database per Service** (cad
 
 ## Padrões e Requisitos Transversais
 
-* **SAGA Orquestrada (Transação Distribuída):** O fluxo de Solicitação e Emissão de Selo cruza Audit → Task → Badge. Detalhes em [`docs/saga.md`](docs/saga.md).
-* **CQRS:** O badge-service separa o modelo de escrita do modelo de consulta pública. Detalhes em [`docs/cqrs.md`](docs/cqrs.md).
+* **SAGA Orquestrada (Transação Distribuída):** O fluxo de Solicitação e Emissão de Selo é coordenado por um serviço dedicado (**`saga-orchestrator`**) fora dos microsserviços de domínio, cruzando `audit-service` → `task-service` → `badge-service`. Detalhes em [`docs/saga.md`](docs/saga.md).
+* **CQRS:** O `badge-service` separa o modelo de escrita do modelo de consulta pública. Detalhes em [`docs/cqrs.md`](docs/cqrs.md).
 * **Persistência:** Database-per-service e outbox detalhados em [`docs/data-consistency.md`](docs/data-consistency.md).
 * **Inteligência Artificial:** Módulo de RAG alimentado por guias oficiais, integrado via LangChain com consulta a tools internas do sistema (previsto para a Parte 4).
+
+---
+
+## Contratos REST e Convenções de API
+
+Todos os serviços internos e BFFs seguem contratos REST explícitos, versionados e padronizados:
+
+* **Versionamento na URI (`/v1`):** Todos os microsserviços internos versionam seus recursos no caminho (ex.: `GET /v1/organizacoes/{ongId}`). Alterações incompatíveis geram `/v2` sem quebra silenciosa. Na borda, o API Gateway expõe `/api/gestao/*` e `/api/publico/*` para os BFFs.
+* **Semântica HTTP e Códigos de Status:**
+  * `200 OK` (leitura/transição), `201 Created` (criação com `Location`), `202 Accepted` (início assíncrono da SAGA em `POST /v1/solicitacoes`), `204 No Content` (encerramento de sessão).
+  * Erros padronizados em **RFC 7807 (`application/problem+json`)** com `type`, `title`, `status` e `detail`: `400`, `401`, `403`, `404`, `409` (conflito de estado) e `422` (regra de negócio recusada).
+* **Cabeçalhos Transversais:**
+  * `X-Correlation-ID`: gerado/propagado pelo API Gateway em todas as requisições e eventos para rastreabilidade distribuída.
+  * `Idempotency-Key`: obrigatório em operações de escrita críticas (`POST` de solicitação, compensação, conclusão, reabertura e revogação), garantindo que retries não dupliquem selos ou tarefas.
+* **HATEOAS (`_links`):** Recursos navegáveis (`Tarefa`, `SolicitacaoSelo` e detalhes no BFF Gestão) retornam `_links` indicando as próximas ações válidas.
+
+### Mapa de Endpoints Principais
+
+| Camada / Serviço | Método & Rota | Descrição | Contrato Detalhado |
+|---|---|---|---|
+| **BFF Público** *(via Gateway)* | `GET /api/publico/selos/{ongId}` | Consulta anônima do selo (CQRS) | [`docs/api/alinhamento-bff.md`](docs/api/alinhamento-bff.md) |
+| **BFF Gestão** *(via Gateway, JWT)* | `POST /api/gestao/sessoes` | Login e emissão de JWT | [`docs/gateway-bffs.md`](docs/gateway-bffs.md) |
+| **BFF Gestão** *(via Gateway, JWT)* | `GET /api/gestao/selos/{ongId}/detalhes` | Visão agregada + `_links` HATEOAS | [`docs/api/alinhamento-bff.md`](docs/api/alinhamento-bff.md) |
+| **BFF Gestão** *(via Gateway, JWT)* | `POST /api/gestao/selos/{ongId}/revogar` | Revogação administrativa de selo | [`docs/api/alinhamento-bff.md`](docs/api/alinhamento-bff.md) |
+| **`saga-orchestrator`** *(interno)* | `POST /v1/solicitacoes` (`202`) · `POST /v1/solicitacoes/{id}/compensacoes` | Orquestração e compensação da SAGA | [`docs/openapi/saga-orchestrator.yaml`](docs/openapi/saga-orchestrator.yaml) |
+| **`org-service`** *(interno)* | `POST /v1/organizacoes` · `GET /v1/organizacoes/{ongId}` · `POST /v1/sessoes` | Cadastro de ONGs, usuários e JWT | [`docs/openapi/org-service.yaml`](docs/openapi/org-service.yaml) |
+| **`audit-service`** *(interno)* | `POST /v1/diagnosticos/{id}/conclusao` · `GET /v1/diagnosticos/{id}` | Questionário e cálculo de score | [`docs/openapi/audit-service.yaml`](docs/openapi/audit-service.yaml) |
+| **`task-service`** *(interno)* | `GET /v1/organizacoes/{ongId}/plano-atual` · `POST /v1/planos/{id}/reabertura` | Plano de ação, tarefas e reabertura | [`docs/openapi/task-service.yaml`](docs/openapi/task-service.yaml) |
+| **`badge-service`** *(interno)* | `POST /v1/selos` · `POST /v1/selos/{id}/revogacao` · `GET /v1/consulta/organizacoes/{ongId}` | Emissão/revogação de selos e leitura CQRS | [`docs/openapi/badge-service.yaml`](docs/openapi/badge-service.yaml) |
+
+Documentação completa das convenções em [`docs/api/versionamento.md`](docs/api/versionamento.md) e [`docs/api/alinhamento-bff.md`](docs/api/alinhamento-bff.md).
 
 ---
 
@@ -137,10 +166,11 @@ O sistema utiliza o padrão de **Microsserviços com Database per Service** (cad
 │   │   ├── gestao/         # BFF Gestão (FastAPI + JWT + HATEOAS)
 │   │   └── publico/        # BFF Público (FastAPI + CQRS Leitura)
 │   └── services/
-│       ├── org-service/    # Gestão de Entidades e Usuários
-│       ├── audit-service/  # Diagnósticos e Auditoria LGPD
-│       ├── task-service/   # Remediação e Tarefas
-│       └── badge-service/  # Emissão e Validação de Selos
+│       ├── saga-orchestrator/ # Orquestrador dedicado da SAGA
+│       ├── org-service/       # Gestão de Entidades e Usuários
+│       ├── audit-service/     # Diagnósticos e Auditoria LGPD
+│       ├── task-service/      # Remediação e Tarefas
+│       └── badge-service/     # Emissão, Revogação e CQRS de Selos
 ├── frontend/
 │   └── web-gestao/         # Painel Web SPA (Multi-stage build Docker)
 ├── gateway/

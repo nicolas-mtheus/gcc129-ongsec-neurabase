@@ -45,16 +45,19 @@ Dono do plano de ação e das tarefas. Informa `tarefas_pendentes`, campo que o 
 
 ### 1.4 badge-service — Certificação
 
-Dono da solicitação, do selo e da consulta pública. Também **orquestra** a SAGA de emissão: é o único serviço que já guarda `historico_saga_emissao` e responde `202` enquanto o selo ainda não está `ATIVO`.
+Dono da emissão/revogação do selo e da consulta pública (CQRS).
 
 **Responsabilidades**
 
-- Aceitar a solicitação de selo.
-- Confirmar, via os outros serviços, diagnóstico concluído e plano sem pendência.
-- Emitir, revogar e compensar o selo.
+- Emitir e revogar o selo digital sob comando do `saga-orchestrator` ou de ação administrativa.
+- Gravar os eventos `SELO_GERADO` e `SELO_REVOGADO` na `outbox` na mesma transação local.
 - Servir a projeção CQRS em `GET /v1/consulta/organizacoes/{ongId}`.
 
-**Fronteira.** Não altera score nem tarefa no banco alheio. Quando precisa compensar remediação, chama o task-service; não escreve na tabela de tarefas.
+**Fronteira.** Não orquestra a SAGA e não chama `audit-service` nem `task-service`. A coordenação da transação distribuída fica isolada no **`saga-orchestrator`**.
+
+### 1.5 saga-orchestrator — Orquestração da SAGA
+
+Serviço dedicado de coordenação distribuída, separado dos quatro microsserviços de domínio. Recebe `POST /v1/solicitacoes` (responde `202`), valida pré-condições em `audit-service` e `task-service`, aciona `badge-service` (`POST /v1/selos`) e executa compensações em ordem inversa (`POST /v1/solicitacoes/{id}/compensacoes`) quando necessário.
 
 ## 2. Por que este corte, e não outro
 
@@ -65,7 +68,7 @@ O enunciado pede a justificativa da fronteira. Os cortes abaixo foram considerad
 | **Um serviço único** (ONG + auditoria + tarefas + selo) | Impede database per service, mistura cadastro frequente com emissão rara e impede isolar a leitura pública do CQRS. Uma falha no questionário derrubaria a consulta do doador. |
 | **Juntar audit-service e task-service** | Diagnosticar e remediar são verbos diferentes. O diagnóstico é um documento com score; o plano é uma máquina de estados com prazo. Juntos, o serviço ficaria gordo e a SAGA perderia um passo compensável (`reabertura`) separado da medição. |
 | **Juntar org-service e badge-service** | Login e cadastro mudam o tempo todo; o selo é emitido poucas vezes e é lido anonimamente. A consulta pública não pode depender da tabela de usuários. O nome da ONG é copiado para a projeção, justamente para o doador não chamar o org-service. |
-| **Quinto serviço só de orquestração** | A solicitação já é o estado da SAGA (`SOLICITADA`, `SELO_EMITIDO`, `COMPENSADA`). Um orquestrador extra seria mais um banco e mais um ponto de *dual write*, sem dado de negócio novo. |
+| **Orquestração dentro do `badge-service`** | Mistura coordenação de fluxo distribuído (`audit` → `task` → `badge`) com regra de domínio de certificação e CQRS. Por isso a orquestração foi extraída para o **`saga-orchestrator`**. |
 | **Cortar por camada** (serviço de API, serviço de persistência) | Isso não é fronteira de domínio. Todos os quatro serviços já expõem REST e já têm banco próprio. |
 
 O org-service **não entra como passo mutável da SAGA**. Ele fornece identidade e o nome da instituição. A transação de negócio que o enunciado exige (três serviços) é **Audit → Task → Badge**.

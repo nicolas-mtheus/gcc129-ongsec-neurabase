@@ -1,0 +1,86 @@
+openapi: 3.0.3
+info:
+  title: ONGSec - saga-orchestrator
+  version: 1.0.0
+  description: Serviço dedicado de orquestração da SAGA de emissão e compensação do Selo Digital.
+servers:
+  - url: http://saga-orchestrator:8000
+    description: Rede interna do cluster/Compose
+paths:
+  /healthz:
+    get:
+      summary: Healthcheck do orquestrador
+      responses:
+        "200":
+          description: Serviço saudável
+  /v1/solicitacoes:
+    post:
+      summary: Inicia a SAGA de emissão do selo
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          required: false
+          schema:
+            type: string
+        - in: header
+          name: X-Correlation-ID
+          required: false
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ong_id, diagnostico_id, plano_id]
+              properties:
+                ong_id:
+                  type: string
+                diagnostico_id:
+                  type: string
+                plano_id:
+                  type: string
+      responses:
+        "202":
+          description: Solicitação aceita e SAGA executada
+        "422":
+          description: Pré-condição de negócio não atendida (diagnóstico sem score ou plano pendente)
+        "503":
+          description: Serviço dependente indisponível
+  /v1/solicitacoes/{solicitacao_id}:
+    get:
+      summary: Consulta o estado e histórico da SAGA
+      parameters:
+        - in: path
+          name: solicitacao_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Estado atual da solicitação com links HATEOAS
+        "404":
+          description: Solicitação não encontrada
+  /v1/solicitacoes/{solicitacao_id}/compensacoes:
+    post:
+      summary: Executa compensação da SAGA em ordem inversa
+      parameters:
+        - in: path
+          name: solicitacao_id
+          required: true
+          schema:
+            type: string
+        - in: header
+          name: X-Correlation-ID
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Compensação aplicada
+        "404":
+          description: Solicitação não encontrada
+        "409":
+          description: Solicitação já compensada
+

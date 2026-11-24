@@ -23,6 +23,7 @@ ORG_SERVICE_URL = os.getenv("ORG_SERVICE_URL", "http://org-service:8000")
 AUDIT_SERVICE_URL = os.getenv("AUDIT_SERVICE_URL", "http://audit-service:8000")
 TASK_SERVICE_URL = os.getenv("TASK_SERVICE_URL", "http://task-service:8000")
 BADGE_SERVICE_URL = os.getenv("BADGE_SERVICE_URL", "http://badge-service:8000")
+SAGA_ORCHESTRATOR_URL = os.getenv("SAGA_ORCHESTRATOR_URL", "http://saga-orchestrator:8000")
 
 app = FastAPI(
     title="ONGSec BFF Gestão",

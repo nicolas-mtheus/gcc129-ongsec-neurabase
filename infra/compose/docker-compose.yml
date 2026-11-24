@@ -48,11 +48,13 @@ services:
       - AUDIT_SERVICE_URL=http://audit-service:8000
       - TASK_SERVICE_URL=http://task-service:8000
       - BADGE_SERVICE_URL=http://badge-service:8000
+      - SAGA_ORCHESTRATOR_URL=http://saga-orchestrator:8000
     depends_on:
       - org-service
       - audit-service
       - task-service
       - badge-service
+      - saga-orchestrator
     restart: unless-stopped
 
   bff-publico:
@@ -207,19 +209,32 @@ services:
     container_name: badge-service
     environment:
       - DATABASE_URL=postgresql+psycopg2://ongsec:${LOCAL_DB_PASSWORD:-ongsec_local_dev}@badge-db:5432/badge_db
-      - AUDIT_SERVICE_URL=http://audit-service:8000
-      - TASK_SERVICE_URL=http://task-service:8000
-      - ORG_SERVICE_URL=http://org-service:8000
     depends_on:
       badge-db:
         condition: service_healthy
-      audit-service:
-        condition: service_started
-      task-service:
-        condition: service_started
     networks:
       - app
       - badge-data
+    restart: unless-stopped
+
+  # --- SAGA-ORCHESTRATOR (Orquestrador dedicado fora dos serviços de domínio) ---
+  saga-orchestrator:
+    build:
+      context: ../../backend/services/saga-orchestrator
+      dockerfile: Dockerfile
+    container_name: saga-orchestrator
+    environment:
+      - ORG_SERVICE_URL=http://org-service:8000
+      - AUDIT_SERVICE_URL=http://audit-service:8000
+      - TASK_SERVICE_URL=http://task-service:8000
+      - BADGE_SERVICE_URL=http://badge-service:8000
+    depends_on:
+      - org-service
+      - audit-service
+      - task-service
+      - badge-service
+    networks:
+      - app
     restart: unless-stopped
 
 # =========================================================================

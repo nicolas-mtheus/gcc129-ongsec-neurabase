@@ -30,7 +30,7 @@
 
 ## 🚀 Execução Rápida do Sistema Completo (Parte 3)
 
-Com a entrega da **Parte 3 (Containerização e Orquestração)**, a plataforma inteira sobe localmente com um **único comando**, orquestrando **13 containers** (Gateway, 2 BFFs, Frontend Web, Orquestrador SAGA dedicado, 4 microsserviços de domínio e 4 bancos PostgreSQL independentes):
+Com a entrega da **Parte 4 (Sistema em Funcionamento & Integração de LLM)**, a plataforma inteira sobe localmente com um **único comando**, orquestrando **14 containers** (Gateway, 2 BFFs, Frontend Web, Orquestrador SAGA dedicado, Serviço de IA com RAG + LangChain + Ollama, 4 microsserviços de domínio e 4 bancos PostgreSQL independentes):
 
 ```bash
 # Na raiz do repositório:
@@ -123,7 +123,7 @@ O sistema utiliza o padrão de **Microsserviços com Database per Service** (cad
 * **SAGA Orquestrada (Transação Distribuída):** O fluxo de Solicitação e Emissão de Selo é coordenado por um serviço dedicado (**`saga-orchestrator`**) fora dos microsserviços de domínio, cruzando `audit-service` → `task-service` → `badge-service`. Detalhes em [`docs/saga.md`](docs/saga.md).
 * **CQRS:** O `badge-service` separa o modelo de escrita do modelo de consulta pública. Detalhes em [`docs/cqrs.md`](docs/cqrs.md).
 * **Persistência:** Database-per-service e outbox detalhados em [`docs/data-consistency.md`](docs/data-consistency.md).
-* **Inteligência Artificial:** Módulo de RAG alimentado por guias oficiais, integrado via LangChain com consulta a tools internas do sistema (previsto para a Parte 4).
+* **Inteligência Artificial (Parte 4 — RAG + LangChain + Ollama):** O `ai-service` integra o modelo local `deephat:latest` via **Ollama** com pipeline completo de **RAG** (base normativa ANPD, CERT.br, CIS IG1, SEBRAE e regras ONGSec), **LangChain** (chains LCEL + 3 tools consultando dados reais dos microsserviços) e resiliência distribuída (Circuit Breaker, Timeout+Retry com Backoff, Cache e Fallback). Avaliação completa em [`docs/rag-avaliacao.md`](docs/rag-avaliacao.md) e análise de resiliência, latência e custo em [`docs/llm-resiliencia-latencia-custo.md`](docs/llm-resiliencia-latencia-custo.md).
 
 ---
 
@@ -166,6 +166,7 @@ Documentação completa das convenções em [`docs/api/versionamento.md`](docs/a
 │   │   ├── gestao/         # BFF Gestão (FastAPI + JWT + HATEOAS)
 │   │   └── publico/        # BFF Público (FastAPI + CQRS Leitura)
 │   └── services/
+│       ├── ai-service/        # Consultor IA (RAG + LangChain + Ollama + Resiliência)
 │       ├── saga-orchestrator/ # Orquestrador dedicado da SAGA
 │       ├── org-service/       # Gestão de Entidades e Usuários
 │       ├── audit-service/     # Diagnósticos e Auditoria LGPD

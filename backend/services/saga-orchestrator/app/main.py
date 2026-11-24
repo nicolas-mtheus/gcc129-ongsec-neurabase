@@ -1,20 +1,24 @@
 """Orquestrador dedicado da SAGA de emissão do Selo Digital (serviço independente)."""
 import os
 import uuid
+from datetime import datetime, timedelta, timezone
 
 import httpx
+import jwt
 from fastapi import FastAPI, Header, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .db import SolicitacaoSaga, criar_tabelas, engine
+from .db import SolicitacaoSaga, agora, criar_tabelas, engine
 
 AUDIT_URL = os.getenv("AUDIT_SERVICE_URL", "http://audit-service:8000")
 TASK_URL = os.getenv("TASK_SERVICE_URL", "http://task-service:8000")
 ORG_URL = os.getenv("ORG_SERVICE_URL", "http://org-service:8000")
 BADGE_URL = os.getenv("BADGE_SERVICE_URL", "http://badge-service:8000")
+JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY") or os.getenv("JWT_SECRET", "ongsec-secret-key-2026")
+JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 
 app = FastAPI(title="ONGSec saga-orchestrator", version="1.0.0")
 
@@ -39,6 +43,16 @@ def erro(status: int, titulo: str, detalhe: str, request: Request) -> JSONRespon
     )
 
 
+def _token_interno(ong_id: str) -> str:
+    payload = {
+        "sub": "saga-orchestrator",
+        "usuario_id": "saga-orchestrator",
+        "ong_id": ong_id,
+        "exp": datetime.now(timezone.utc) + timedelta(minutes=5),
+    }
+    return jwt.encode(payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
+
+
 @app.on_event("startup")
 def iniciar():
     criar_tabelas()
@@ -52,6 +66,7 @@ def iniciar():
                     plano_id="plano-1",
                     estado="SELO_EMITIDO",
                     id_selo="CERT-2026-998",
+                    criado_em="2026-10-10T14:00:00+00:00",
                     historico=[
                         {"evento": "DIAGNOSTICO_CONCLUIDO", "servico": "audit-service", "sucesso": True},
                         {"evento": "TAREFAS_REMEDIADAS", "servico": "task-service", "sucesso": True},
@@ -62,8 +77,17 @@ def iniciar():
             s.commit()
 
 
-def _chamar(metodo: str, url: str, corr: str | None, json_body: dict | None = None, extra_headers: dict | None = None):
+def _chamar(
+    metodo: str,
+    url: str,
+    corr: str | None,
+    json_body: dict | None = None,
+    extra_headers: dict | None = None,
+    auth_ong_id: str | None = None,
+):
     headers = {"X-Correlation-ID": corr or ""}
+    if auth_ong_id:
+        headers["Authorization"] = f"Bearer {_token_interno(auth_ong_id)}"
     if extra_headers:
         headers.update(extra_headers)
     try:
@@ -88,6 +112,7 @@ def _solicitacao_json(sol: SolicitacaoSaga) -> dict:
         "plano_id": sol.plano_id,
         "estado": sol.estado,
         "historico_saga_emissao": sol.historico,
+        "criado_em": sol.criado_em,
         "_links": links,
     }
     if sol.id_selo:
@@ -118,11 +143,20 @@ def iniciar_saga(
 
     # Passo 1 e 2: validar pré-condições no audit-service e task-service
     try:
-        st_diag, diag = _chamar("GET", f"{AUDIT_URL}/v1/diagnosticos/{corpo.diagnostico_id}", x_correlation_id)
+        st_diag, diag = _chamar(
+            "GET",
+            f"{AUDIT_URL}/v1/diagnosticos/{corpo.diagnostico_id}",
+            x_correlation_id,
+            auth_ong_id=corpo.ong_id,
+        )
         if st_diag != 200 or not diag or diag.get("status") != "CONCLUIDO" or diag.get("score") is None:
             return erro(422, "Pré-condição não atendida", "Diagnóstico não concluído ou sem score", request)
 
-        st_plano, plano = _chamar("GET", f"{TASK_URL}/v1/organizacoes/{corpo.ong_id}/plano-atual", x_correlation_id)
+        st_plano, plano = _chamar(
+            "GET",
+            f"{TASK_URL}/v1/organizacoes/{corpo.ong_id}/plano-atual",
+            x_correlation_id,
+        )
         if st_plano != 200 or not plano or plano.get("plano_id") != corpo.plano_id or plano.get("tarefas_pendentes") != 0:
             return erro(422, "Pré-condição não atendida", "O plano ainda tem tarefas pendentes", request)
     except RuntimeError as e:
@@ -130,7 +164,12 @@ def iniciar_saga(
 
     nome_instituicao = f"Organização {corpo.ong_id}"
     try:
-        st_org, org = _chamar("GET", f"{ORG_URL}/v1/organizacoes/{corpo.ong_id}", x_correlation_id)
+        st_org, org = _chamar(
+            "GET",
+            f"{ORG_URL}/v1/organizacoes/{corpo.ong_id}",
+            x_correlation_id,
+            auth_ong_id=corpo.ong_id,
+        )
         if st_org == 200 and org and org.get("nome_instituicao"):
             nome_instituicao = org["nome_instituicao"]
     except RuntimeError:
@@ -151,6 +190,7 @@ def iniciar_saga(
             estado="SOLICITADA",
             historico=historico,
             idempotency_key=idempotency_key,
+            criado_em=agora(),
         )
         s.add(sol)
         s.commit()
@@ -183,20 +223,34 @@ def iniciar_saga(
             s.commit()
             return _solicitacao_json(sol)
     except Exception:
-        # Compensação em ordem inversa: marcar solicitação COMPENSADA e reabrir plano no task-service
+        # Compensação em ordem inversa:
+        # 1) Revogar selo ativo existente na ONG (se houver) para refletir no CQRS público
+        try:
+            st_cert, cert = _chamar("GET", f"{BADGE_URL}/v1/organizacoes/{corpo.ong_id}/certificacao", x_correlation_id)
+            if st_cert == 200 and cert and cert.get("status_conformidade") == "ATIVO" and cert.get("id_selo"):
+                _chamar("POST", f"{BADGE_URL}/v1/selos/{cert['id_selo']}/revogacao", x_correlation_id)
+        except RuntimeError:
+            pass
+
+        # 2) Reabrir plano de tarefas no task-service (audit-service permanece intacto: fato histórico)
+        reabriu = False
+        try:
+            st_reab, _ = _chamar("POST", f"{TASK_URL}/v1/planos/{corpo.plano_id}/reabertura", x_correlation_id)
+            reabriu = st_reab == 200
+        except RuntimeError:
+            pass
+
+        # 3) Registrar falha e compensação na SAGA
         with Session(engine) as s:
             sol = s.get(SolicitacaoSaga, sol_id)
             sol.estado = "COMPENSADA"
             sol.historico = list(sol.historico) + [
-                {"evento": "SOLICITACAO_COMPENSADA", "servico": "saga-orchestrator", "sucesso": True}
+                {"evento": "FALHA_EMISSAO_SELO", "servico": "badge-service", "sucesso": False},
+                {"evento": "PLANO_REABERTO_COMPENSACAO", "servico": "task-service", "sucesso": reabriu},
+                {"evento": "SOLICITACAO_COMPENSADA", "servico": "saga-orchestrator", "sucesso": True},
             ]
             s.commit()
-        try:
-            _chamar("POST", f"{TASK_URL}/v1/planos/{corpo.plano_id}/reabertura", x_correlation_id)
-        except RuntimeError:
-            pass
-        with Session(engine) as s:
-            return _solicitacao_json(s.get(SolicitacaoSaga, sol_id))
+            return _solicitacao_json(sol)
 
 
 @app.get("/v1/solicitacoes/{solicitacao_id}")
@@ -205,6 +259,19 @@ def obter_solicitacao(solicitacao_id: str, request: Request):
         sol = s.get(SolicitacaoSaga, solicitacao_id)
         if not sol:
             return erro(404, "Solicitação não encontrada", solicitacao_id, request)
+        return _solicitacao_json(sol)
+
+
+@app.get("/v1/organizacoes/{ong_id}/ultima-solicitacao")
+def ultima_solicitacao(ong_id: str, request: Request):
+    with Session(engine) as s:
+        sol = s.scalars(
+            select(SolicitacaoSaga)
+            .where(SolicitacaoSaga.ong_id == ong_id)
+            .order_by(SolicitacaoSaga.criado_em.desc())
+        ).first()
+        if not sol:
+            return erro(404, "Nenhuma solicitação SAGA para a organização", ong_id, request)
         return _solicitacao_json(sol)
 
 
@@ -234,8 +301,8 @@ def compensar_solicitacao(solicitacao_id: str, request: Request, x_correlation_i
         sol = s.get(SolicitacaoSaga, solicitacao_id)
         sol.estado = "COMPENSADA"
         sol.historico = list(sol.historico) + [
-            {"evento": "SOLICITACAO_COMPENSADA", "servico": "saga-orchestrator", "sucesso": True}
+            {"evento": "PLANO_REABERTO_COMPENSACAO", "servico": "task-service", "sucesso": True},
+            {"evento": "SOLICITACAO_COMPENSADA", "servico": "saga-orchestrator", "sucesso": True},
         ]
         s.commit()
         return _solicitacao_json(sol)
-

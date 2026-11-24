@@ -182,6 +182,9 @@ async function carregarDados() {
     // Render HATEOAS Links
     renderHateoasLinks(data._links || {});
 
+    // Carregar tarefas ao vivo do task-service
+    await carregarTarefas();
+
     showToast('Dados atualizados via BFF Gestão.', 'success');
   } catch (err) {
     console.error('Falha ao carregar dados:', err);
@@ -343,6 +346,288 @@ btnLogout.addEventListener('click', logout);
 btnAtualizar.addEventListener('click', carregarDados);
 btnRevogar.addEventListener('click', revogarSelo);
 btnConsultarPublico.addEventListener('click', consultarSeloPublico);
+
+// ---------- Parte 4: SAGA ao vivo, Tarefas, Evidência de Bancos e Assistente IA ----------
+async function carregarTarefas() {
+  const box = document.getElementById('tarefasPlanoBox');
+  const badge = document.getElementById('sagaPlanoBadge');
+  if (!box || !jwtToken) return;
+  try {
+    const res = await fetch('/api/gestao/tarefas/ong-123', {
+      headers: { 'Authorization': `Bearer ${jwtToken}` }
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (badge) {
+      badge.textContent = `${data.plano_id} • ${data.tarefas_pendentes} pendente(s)`;
+    }
+    const tarefas = data.tarefas || [];
+    box.innerHTML = tarefas.map(t => `
+      <div class="task-live-item">
+        <div style="display:flex; justify-content:space-between; gap:0.5rem; align-items:center;">
+          <strong>${escapeHtml(t.titulo)}</strong>
+          <span class="status-pill ${t.status === 'CONCLUIDA' ? 'status-active' : 'status-revoked'}" style="font-size:0.7rem; padding:0.15rem 0.5rem;">
+            ${escapeHtml(t.status)}
+          </span>
+        </div>
+        <div style="color:var(--text-dim); margin-top:0.35rem; font-size:0.78rem;">
+          ID: <code>${escapeHtml(t.tarefa_id)}</code> • Prazo: ${escapeHtml(t.prazo)}
+        </div>
+      </div>
+    `).join('');
+  } catch (err) {
+    console.warn('Falha ao listar tarefas:', err);
+  }
+}
+
+async function executarSaga(simularFalha) {
+  if (!jwtToken) {
+    showToast('Faça login primeiro para executar a SAGA.', 'error');
+    return;
+  }
+  const btn = document.getElementById(simularFalha ? 'btnSagaFalha' : 'btnSagaSucesso');
+  if (btn) btn.disabled = true;
+  try {
+    const res = await fetch('/api/gestao/saga/ong-123/executar', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${jwtToken}`
+      },
+      body: JSON.stringify({ simular_falha: simularFalha, diagnostico_id: 'diag-55', plano_id: 'plano-1' })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      showToast(`SAGA recusada (HTTP ${res.status}): ${data.detail || 'Pré-condição não atendida'}`, 'error');
+    } else if (data.estado === 'COMPENSADA') {
+      showToast('Falha simulada! SAGA executou compensação: selo revogado e tarefas reabertas.', 'info');
+    } else {
+      showToast(`SAGA concluída com sucesso! Selo ${data.id_selo || ''} emitido.`, 'success');
+    }
+    await carregarDados();
+  } catch (err) {
+    showToast('Erro ao executar SAGA: ' + err.message, 'error');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function concluirTarefasReabertas() {
+  if (!jwtToken) {
+    showToast('Faça login primeiro.', 'error');
+    return;
+  }
+  try {
+    const res = await fetch('/api/gestao/tarefas/ong-123/concluir-todas', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${jwtToken}` }
+    });
+    if (res.ok) {
+      showToast('Todas as tarefas do plano-1 foram concluídas no task-service!', 'success');
+      await carregarDados();
+    } else {
+      showToast(`Erro ao concluir tarefas (HTTP ${res.status})`, 'error');
+    }
+  } catch (err) {
+    showToast('Erro: ' + err.message, 'error');
+  }
+}
+
+async function inspecionarBancos() {
+  if (!jwtToken) {
+    showToast('Faça login primeiro para inspecionar os bancos.', 'error');
+    return;
+  }
+  const grid = document.getElementById('bancosEvidenciaGrid');
+  if (!grid) return;
+  grid.innerHTML = '<span style="color:var(--text-dim);">Consultando os bancos isolados...</span>';
+  try {
+    const res = await fetch('/api/gestao/evidencia-bancos?ong_id=ong-123', {
+      headers: { 'Authorization': `Bearer ${jwtToken}` }
+    });
+    const data = await res.json();
+    grid.innerHTML = (data.bancos || []).map(b => `
+      <div class="db-card">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <strong>${escapeHtml(b.banco)}</strong>
+          <span class="status-pill ${b.status === 200 ? 'status-active' : 'status-revoked'}" style="font-size:0.7rem; padding:0.1rem 0.45rem;">HTTP ${b.status}</span>
+        </div>
+        <div style="color:var(--text-dim); font-size:0.76rem; margin-top:0.2rem;">
+          Serviço: <code>${escapeHtml(b.servico)}</code> • Rede: <code>${escapeHtml(b.rede_isolada)}</code>
+        </div>
+        <pre>${escapeHtml(JSON.stringify(b.dados || b.erro, null, 2))}</pre>
+      </div>
+    `).join('');
+    showToast('Bancos isolados inspecionados com sucesso!', 'success');
+  } catch (err) {
+    grid.innerHTML = `<span style="color:var(--danger);">Erro: ${escapeHtml(err.message)}</span>`;
+  }
+}
+
+function atualizarBarraIa(data) {
+  const cb = data.circuit_breaker || {};
+  const cbEl = document.getElementById('aiCbEstado');
+  const modoEl = document.getElementById('aiModoTag');
+  const latEl = document.getElementById('aiLatenciaTag');
+  const badgeEl = document.getElementById('aiModoBadge');
+  if (cbEl && cb.estado) cbEl.textContent = `${cb.estado} (${cb.falhas_consecutivas || 0}/${cb.limiar_abertura || 2})`;
+  if (modoEl && data.modo_operacao) modoEl.textContent = data.modo_operacao;
+  if (latEl && data.latencia_ms !== undefined) latEl.textContent = `${data.latencia_ms} ms`;
+  if (badgeEl && data.modo_operacao) badgeEl.textContent = data.modo_operacao;
+}
+
+async function consultarIA(simularFalha = false) {
+  if (!jwtToken) {
+    showToast('Faça login primeiro para usar o Assistente IA.', 'error');
+    return;
+  }
+  const pergunta = document.getElementById('aiPerguntaInput').value.trim();
+  const usarRag = document.getElementById('aiUsarRag').checked;
+  const usarCache = document.getElementById('aiUsarCache').checked;
+  const btn = document.getElementById('btnIaConsultar');
+  if (!pergunta) return;
+  btn.disabled = true;
+  btn.textContent = '⏳ Consultando Ollama + RAG...';
+
+  try {
+    const res = await fetch('/api/gestao/ia/consultoria', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${jwtToken}`
+      },
+      body: JSON.stringify({
+        ong_id: 'ong-123',
+        pergunta,
+        usar_rag: usarRag,
+        usar_cache: usarCache,
+        simular_falha_llm: simularFalha
+      })
+    });
+    const data = await res.json();
+    document.getElementById('aiRespostaContainer').style.display = 'grid';
+    document.getElementById('aiRespostaTexto').textContent = data.resposta || JSON.stringify(data);
+    atualizarBarraIa(data);
+
+    const chunks = data.rag_fontes || [];
+    document.getElementById('aiChunksCount').textContent = `${chunks.length} chunk(s)`;
+    const tools = data.dados_tools || {};
+    document.getElementById('aiToolsResumo').innerHTML = `
+      <strong>🔧 Tools LangChain executadas:</strong> <code>${escapeHtml((tools.tools_executadas || []).join(', '))}</code>
+      <pre style="margin-top:0.35rem; white-space:pre-wrap; font-size:0.74rem;">${escapeHtml(JSON.stringify({
+        perfil: tools.perfil_ong,
+        diag_plano: tools.diagnostico_e_plano,
+        selo_cqrs: tools.selo_publico_cqrs
+      }, null, 2))}</pre>
+    `;
+    document.getElementById('aiRagResumo').innerHTML = chunks.length
+      ? '<strong>📚 Fontes recuperadas (RAG):</strong>' + chunks.map(c => `
+          <div style="margin-top:0.4rem; padding-top:0.35rem; border-top:1px solid var(--border-subtle);">
+            <code>${escapeHtml(c.documento)}</code> (sim: <strong>${c.score_similaridade}</strong>)<br>
+            <span style="color:var(--text-dim);">${escapeHtml(c.trecho.slice(0, 190))}...</span>
+          </div>
+        `).join('')
+      : '<strong>📚 RAG desativado nesta consulta.</strong>';
+
+    await atualizarMetricasIA();
+    showToast(`Consultoria IA concluída (${data.modo_operacao}) em ${data.latencia_ms} ms`, data.modo_operacao === 'FALLBACK_RESILIENTE' ? 'info' : 'success');
+  } catch (err) {
+    showToast('Erro no Assistente IA: ' + err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '🤖 Consultar Assistente IA';
+  }
+}
+
+async function compararRagIA() {
+  if (!jwtToken) {
+    showToast('Faça login primeiro.', 'error');
+    return;
+  }
+  const pergunta = document.getElementById('aiPerguntaInput').value.trim();
+  const btn = document.getElementById('btnIaComparar');
+  if (!pergunta) return;
+  btn.disabled = true;
+  btn.textContent = '⏳ Comparando...';
+  try {
+    const res = await fetch('/api/gestao/ia/comparar-rag', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${jwtToken}`
+      },
+      body: JSON.stringify({ ong_id: 'ong-123', pergunta })
+    });
+    const data = await res.json();
+    document.getElementById('aiComparacaoContainer').style.display = 'block';
+    document.getElementById('aiCompComRag').textContent = `[${data.com_rag?.modo_operacao} • ${data.com_rag?.latencia_ms} ms]\n\n${data.com_rag?.resposta || ''}`;
+    document.getElementById('aiCompSemRag').textContent = `[${data.sem_rag?.modo_operacao} • ${data.sem_rag?.latencia_ms} ms]\n\n${data.sem_rag?.resposta || ''}`;
+    await atualizarMetricasIA();
+    showToast('Comparação COM RAG vs. SEM RAG concluída!', 'success');
+  } catch (err) {
+    showToast('Erro ao comparar RAG: ' + err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '⚖️ Comparar COM RAG vs. SEM RAG';
+  }
+}
+
+async function controlarCbIA(acao) {
+  if (!jwtToken) return;
+  try {
+    const res = await fetch('/api/gestao/ia/circuit-breaker', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${jwtToken}` },
+      body: JSON.stringify({ acao })
+    });
+    const data = await res.json();
+    atualizarBarraIa(data);
+    await atualizarMetricasIA();
+    showToast(`Circuit Breaker: ação "${acao}" aplicada (${data.circuit_breaker?.estado}).`, 'info');
+  } catch (err) {
+    showToast('Erro: ' + err.message, 'error');
+  }
+}
+
+async function atualizarMetricasIA() {
+  if (!jwtToken) return;
+  try {
+    const res = await fetch('/api/gestao/ia/metricas', {
+      headers: { 'Authorization': `Bearer ${jwtToken}` }
+    });
+    if (!res.ok) return;
+    const m = await res.json();
+    atualizarBarraIa(m);
+    const cacheTag = document.getElementById('aiCacheTag');
+    if (cacheTag) cacheTag.textContent = `${m.cache?.hits || 0} (${m.cache?.taxa_acerto_pct || 0}%)`;
+    const box = document.getElementById('aiMetricasBox');
+    if (box) {
+      const l = m.latencia_medida || {};
+      const c = m.estimativa_custo_escala || {};
+      box.innerHTML = `
+        <div class="db-card"><strong>Requisições & Retries</strong><br>Total: ${m.total_requisicoes} • Retries: ${m.retries_executados} • Fallbacks: ${m.fallbacks_acionados}</div>
+        <div class="db-card"><strong>Latência Ollama (ms)</strong><br>Média: ${l.llm_ollama?.media_ms || 0} ms • Min/Max: ${l.llm_ollama?.min_ms || 0}/${l.llm_ollama?.max_ms || 0} ms</div>
+        <div class="db-card"><strong>Latência Cache & Fallback</strong><br>Cache: ${l.cache_hit?.media_ms || 0} ms • Fallback: ${l.fallback?.media_ms || 0} ms</div>
+        <div class="db-card"><strong>Custo em Escala (1.000 consultas)</strong><br>Ollama Local: US$ 0,00 • Cloud ref.: US$ ${c.custo_cloud_1000_consultas_usd || 0}</div>
+      `;
+    }
+  } catch (err) {
+    console.warn(err);
+  }
+}
+
+document.getElementById('btnSagaSucesso')?.addEventListener('click', () => executarSaga(false));
+document.getElementById('btnSagaFalha')?.addEventListener('click', () => executarSaga(true));
+document.getElementById('btnConcluirTarefas')?.addEventListener('click', concluirTarefasReabertas);
+document.getElementById('btnEvidenciaBancos')?.addEventListener('click', inspecionarBancos);
+document.getElementById('aiPresetSelect')?.addEventListener('change', (e) => {
+  document.getElementById('aiPerguntaInput').value = e.target.value;
+});
+document.getElementById('btnIaConsultar')?.addEventListener('click', () => consultarIA(false));
+document.getElementById('btnIaComparar')?.addEventListener('click', compararRagIA);
+document.getElementById('btnIaSimularFalha')?.addEventListener('click', () => consultarIA(true));
+document.getElementById('btnIaResetCb')?.addEventListener('click', () => controlarCbIA('fechar'));
+document.getElementById('btnIaMetricas')?.addEventListener('click', atualizarMetricasIA);
 
 // Initialize
 checkEdgeHealth();

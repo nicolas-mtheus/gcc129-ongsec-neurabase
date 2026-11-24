@@ -1,0 +1,10 @@
+{
+  "name": "mobile-publico",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Portal Mobile Publico PWA - ONGSec",
+  "scripts": {
+    "build": "mkdir -p dist && cp index.html style.css app.js manifest.json dist/"
+  }
+}
+

@@ -2,7 +2,7 @@ import os
 import time
 from datetime import datetime, timezone
 
-from sqlalchemy import JSON, String, create_engine
+from sqlalchemy import JSON, String, create_engine, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 DATABASE_URL = os.getenv("DATABASE_URL")
@@ -68,6 +68,7 @@ class SeloPublico(Base):
     ong_id: Mapped[str] = mapped_column(String(50), primary_key=True)
     id_selo: Mapped[str] = mapped_column(String(50))
     nome_instituicao: Mapped[str] = mapped_column(String(200))
+    cnpj: Mapped[str | None] = mapped_column(String(20), nullable=True)
     status_conformidade: Mapped[str] = mapped_column(String(20))
     emitido_em: Mapped[str] = mapped_column(String(40))
     mensagem: Mapped[str] = mapped_column(String(200))
@@ -78,6 +79,9 @@ def criar_tabelas():
     for _ in range(30):
         try:
             Base.metadata.create_all(engine)
+            with engine.begin() as conn:
+                if "postgresql" in DATABASE_URL:
+                    conn.execute(text("ALTER TABLE selo_publico ADD COLUMN IF NOT EXISTS cnpj VARCHAR(20)"))
             return
         except Exception:
             time.sleep(2)

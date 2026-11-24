@@ -15,16 +15,26 @@ services:
       - bff-gestao
       - bff-publico
       - web-gestao
+      - mobile-publico
     restart: unless-stopped
 
   # =========================================================================
-  # 2. Painel Web de Gestão (Frontend SPA - Servido em /gestao/)
+  # 2. Painel Web de Gestão e Portal Mobile Público (Frontends SPA)
   # =========================================================================
   web-gestao:
     build:
       context: ../../frontend/web-gestao
       dockerfile: Dockerfile
     container_name: web-gestao
+    networks:
+      - edge
+    restart: unless-stopped
+
+  mobile-publico:
+    build:
+      context: ../../frontend/mobile-publico
+      dockerfile: Dockerfile
+    container_name: mobile-publico
     networks:
       - edge
     restart: unless-stopped
@@ -43,7 +53,8 @@ services:
     environment:
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-ongsec-secret-key-2026}
       - JWT_ALGORITHM=HS256
-      - MOCK_FALLBACK=true
+      - MOCK_FALLBACK=false
+      - REDIS_URL=redis://redis:6379/0
       - ORG_SERVICE_URL=http://org-service:8000
       - AUDIT_SERVICE_URL=http://audit-service:8000
       - TASK_SERVICE_URL=http://task-service:8000
@@ -51,6 +62,7 @@ services:
       - SAGA_ORCHESTRATOR_URL=http://saga-orchestrator:8000
       - AI_SERVICE_URL=http://ai-service:8000
     depends_on:
+      - redis
       - org-service
       - audit-service
       - task-service
@@ -68,7 +80,7 @@ services:
       - edge
       - app
     environment:
-      - MOCK_FALLBACK=true
+      - MOCK_FALLBACK=false
       - BADGE_SERVICE_URL=http://badge-service:8000
     depends_on:
       - badge-service
@@ -106,8 +118,12 @@ services:
       - DATABASE_URL=postgresql+psycopg://ongsec:${LOCAL_DB_PASSWORD:-ongsec_local_dev}@org-db:5432/org_db
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-ongsec-secret-key-2026}
       - JWT_ALGORITHM=HS256
+      - ADMIN_DEFAULT_PASSWORD=${ADMIN_DEFAULT_PASSWORD:-admin123}
+      - REDIS_URL=redis://redis:6379/0
     depends_on:
       org-db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     networks:
       - app
@@ -211,12 +227,28 @@ services:
     container_name: badge-service
     environment:
       - DATABASE_URL=postgresql+psycopg2://ongsec:${LOCAL_DB_PASSWORD:-ongsec_local_dev}@badge-db:5432/badge_db
+      - REDIS_URL=redis://redis:6379/0
     depends_on:
       badge-db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     networks:
       - app
       - badge-data
+    restart: unless-stopped
+
+  # --- REDIS (Broker de Eventos Outbox/CQRS e Revogação de Sessões JWT) ---
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - app
     restart: unless-stopped
 
   # --- SAGA-ORCHESTRATOR (Orquestrador dedicado fora dos serviços de domínio) ---
@@ -226,10 +258,14 @@ services:
       dockerfile: Dockerfile
     container_name: saga-orchestrator
     environment:
+      - DATABASE_URL=sqlite:////app/data/saga_orchestrator.db
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-ongsec-secret-key-2026}
       - ORG_SERVICE_URL=http://org-service:8000
       - AUDIT_SERVICE_URL=http://audit-service:8000
       - TASK_SERVICE_URL=http://task-service:8000
       - BADGE_SERVICE_URL=http://badge-service:8000
+    volumes:
+      - saga_db_data:/app/data
     depends_on:
       - org-service
       - audit-service
@@ -291,3 +327,4 @@ volumes:
   audit_db_data: {}
   task_db_data: {}
   badge_db_data: {}
+  saga_db_data: {}

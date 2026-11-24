@@ -43,7 +43,7 @@ def _get_json(url: str, headers: dict[str, str]) -> dict[str, Any] | None:
 
 @tool
 def consultar_perfil_ong(ong_id: str) -> dict[str, Any]:
-    """Consulta os dados cadastrais reais da organização (nome, CNPJ e responsável legal) no org-service."""
+    """Consulta os dados cadastrais e o perfil operacional real da organização no org-service."""
     data = _get_json(f"{ORG_URL}/v1/organizacoes/{ong_id}", _auth_headers(ong_id))
     if not data:
         return {"ong_id": ong_id, "erro": "org-service indisponível ou ONG não encontrada"}
@@ -53,6 +53,10 @@ def consultar_perfil_ong(ong_id: str) -> dict[str, Any]:
         "cnpj": data.get("cnpj"),
         "responsavel_legal": data.get("responsavel_legal"),
         "email": data.get("email"),
+        "descricao_atividades": data.get("descricao_atividades") or "",
+        "publico_atendido": data.get("publico_atendido") or [],
+        "canais_coleta_dados": data.get("canais_coleta_dados") or [],
+        "perfil_completo": bool(data.get("perfil_completo", False)),
     }
 
 

@@ -64,6 +64,7 @@ class ConsultaPublicaSelo(BaseModel):
     id_selo: str
     ong_id: str
     nome_instituicao: str
+    cnpj: Optional[str] = None
     status_conformidade: str
     emitido_em: str
     mensagem: str
@@ -110,6 +111,36 @@ async def _obter_selo_publico(ong_id: str, correlation_id: str):
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Serviço de consulta de selos indisponível no momento."
         )
+
+@app.get(
+    "/api/publico/selos",
+    summary="Lista e pesquisa ONGs certificadas na projeção CQRS",
+    tags=["Consulta Pública"]
+)
+@app.get(
+    "/selos",
+    include_in_schema=False
+)
+async def listar_selos(request: Request, q: Optional[str] = None):
+    corr_id = getattr(request.state, "correlation_id", str(uuid.uuid4()))
+    params = {"q": q} if q else {}
+    try:
+        async with httpx.AsyncClient(timeout=4.0) as client:
+            resp = await client.get(
+                f"{BADGE_SERVICE_URL}/v1/consulta/organizacoes",
+                params=params,
+                headers={"X-Correlation-ID": corr_id},
+            )
+            if resp.status_code == 200:
+                return resp.json()
+            raise HTTPException(status_code=resp.status_code, detail="Erro ao listar selos")
+    except httpx.RequestError as exc:
+        logger.warning("badge-service indisponível na listagem pública: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Serviço de consulta de selos indisponível no momento.",
+        )
+
 
 @app.get(
     "/api/publico/selos/{ong_id}",

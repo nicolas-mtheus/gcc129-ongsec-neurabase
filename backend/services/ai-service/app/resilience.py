@@ -188,6 +188,9 @@ def gerar_fallback_contextualizado(
 
     nome = perfil.get("nome_instituicao") or perfil.get("ong_id", "Organização")
     resp = perfil.get("responsavel_legal") or "Responsável Legal"
+    desc = perfil.get("descricao_atividades") or ""
+    publico = ", ".join(perfil.get("publico_atendido") or [])
+    canais = ", ".join(perfil.get("canais_coleta_dados") or [])
     score = diag.get("score", "N/A")
     pendentes = plano.get("tarefas_pendentes", 0)
     tarefas = plano.get("tarefas", [])
@@ -196,8 +199,14 @@ def gerar_fallback_contextualizado(
     linhas = [
         f"[Modo Resiliente / Fallback — {motivo}]",
         f"Organização consultada via LangChain Tools: {nome} (CNPJ: {perfil.get('cnpj', 'N/A')}, Responsável: {resp}).",
-        f"Estado atual no sistema: Score LGPD = {score}%, Tarefas pendentes = {pendentes}, Selo CQRS = {status_selo}.",
     ]
+    if desc or publico or canais:
+        linhas.append(
+            f"Perfil da ONG: atividades='{desc[:120] or 'N/I'}' | público={publico or 'N/I'} | canais={canais or 'N/I'}."
+        )
+    linhas.append(
+        f"Estado atual no sistema: Score LGPD = {score}%, Tarefas pendentes = {pendentes}, Selo CQRS = {status_selo}."
+    )
     if tarefas:
         resumo_t = "; ".join(f"{t['titulo']} [{t['status']}]" for t in tarefas)
         linhas.append(f"Plano de ação ({plano.get('plano_id', 'plano-1')}): {resumo_t}.")
@@ -309,4 +318,168 @@ def executar_com_resiliencia(
         "circuit_breaker": circuit_breaker.snapshot(),
         "motivo_fallback": ultimo_erro,
     }
+
+
+def gerar_perguntas_fallback_perfil(perfil_ong: dict[str, Any], quantidade: int = 5) -> list[dict[str, Any]]:
+    """Gera perguntas de fallback contextualizadas pelo público atendido e canais de coleta."""
+    publicos = [str(p).lower() for p in (perfil_ong.get("publico_atendido") or [])]
+    canais = [str(c).lower() for c in (perfil_ong.get("canais_coleta_dados") or [])]
+    banco: list[dict[str, Any]] = []
+
+    if any("criança" in p or "crianca" in p or "adolescente" in p for p in publicos):
+        banco.append({
+            "categoria": "Proteção de Menores (Art. 14)",
+            "pergunta": "Para dados e imagens de crianças e adolescentes, a ONG obtém termo de consentimento específico assinado por um dos pais ou responsável legal?",
+            "peso": 3,
+            "justificativa_curta": "O Art. 14 da LGPD exige consentimento específico e destacado de pelo menos um dos pais ou responsável.",
+            "tarefa_remediacao": "Implantar termo de consentimento parental para dados de crianças e adolescentes",
+        })
+    if any("saúde" in p or "saude" in p or "paciente" in p for p in publicos):
+        banco.append({
+            "categoria": "Dados Sensíveis de Saúde (Art. 11)",
+            "pergunta": "Prontuários, laudos médicos e informações de saúde dos pacientes têm acesso restrito apenas à equipe técnica autorizada?",
+            "peso": 3,
+            "justificativa_curta": "Dados referentes à saúde são considerados sensíveis pela LGPD e exigem sigilo e controle de acesso rigorosos.",
+            "tarefa_remediacao": "Restringir acesso a prontuários e laudos de saúde apenas à equipe autorizada",
+        })
+    if any("idoso" in p for p in publicos):
+        banco.append({
+            "categoria": "Atendimento a Idosos",
+            "pergunta": "Os avisos de privacidade para pessoas idosas e seus familiares são apresentados com linguagem acessível e letra legível antes da coleta?",
+            "peso": 2,
+            "justificativa_curta": "A transparência exige que pessoas idosas e curadores compreendam facilmente o uso de seus dados.",
+            "tarefa_remediacao": "Adaptar aviso de privacidade em linguagem simples para idosos e familiares",
+        })
+    if any("whatsapp" in c for c in canais):
+        banco.append({
+            "categoria": "Segurança no WhatsApp",
+            "pergunta": "A equipe evita enviar CPFs, documentos ou planilhas de beneficiários em grupos abertos de WhatsApp e usa verificação em duas etapas no aplicativo?",
+            "peso": 3,
+            "justificativa_curta": "Celulares pessoais e grupos de WhatsApp sem PIN aumentam o risco de compartilhamento indevido de dados.",
+            "tarefa_remediacao": "Proibir tráfego de fichas sensíveis no WhatsApp e ativar PIN de 2 etapas",
+        })
+    if any("papel" in c or "físic" in c for c in canais):
+        banco.append({
+            "categoria": "Fichas em Papel",
+            "pergunta": "Os formulários em papel preenchidos no atendimento são armazenados em armários trancados e picotados antes do descarte?",
+            "peso": 2,
+            "justificativa_curta": "Documentos físicos também são regulados pela LGPD e precisam de guarda segura e descarte destrutivo.",
+            "tarefa_remediacao": "Proteger fichas em papel em arquivo trancado e adotar fragmentadora no descarte",
+        })
+    if any("planilha" in c for c in canais):
+        banco.append({
+            "categoria": "Planilhas e Controle",
+            "pergunta": "As planilhas de beneficiários, doadores ou voluntários possuem senha de proteção, histórico de alterações e permissão limitada por função?",
+            "peso": 2,
+            "justificativa_curta": "Planilhas compartilhadas sem restrição frequentemente levam à exposição acidental de CPFs e contatos.",
+            "tarefa_remediacao": "Aplicar controle de acesso e proteção por senha nas planilhas da ONG",
+        })
+    if any("site" in c or "rede" in c or "social" in c for c in canais):
+        banco.append({
+            "categoria": "Site e Redes Sociais",
+            "pergunta": "O site e os formulários digitais da ONG usam HTTPS e exibem aviso de privacidade antes de coletar dados de doadores ou voluntários?",
+            "peso": 2,
+            "justificativa_curta": "Coletas digitais precisam informar finalidade do cadastro e proteger o tráfego com criptografia HTTPS.",
+            "tarefa_remediacao": "Adicionar aviso de privacidade e HTTPS nos formulários do site e redes sociais",
+        })
+
+    padrao_extra = [
+        {
+            "categoria": "Continuidade & Backup",
+            "pergunta": "A instituição realiza backups criptografados (regra 3-2-1) dos cadastros essenciais com teste periódico de restauração?",
+            "peso": 2,
+            "justificativa_curta": "Cópias seguras garantem que a ONG não perca o histórico de atendimentos em falhas ou ataques.",
+            "tarefa_remediacao": "Configurar rotina semanal de backup 3-2-1 criptografado",
+        },
+        {
+            "categoria": "Doadores & Voluntários",
+            "pergunta": "Os termos de voluntariado e cadastros de doadores contêm cláusula de confidencialidade e finalidade clara de contato?",
+            "peso": 2,
+            "justificativa_curta": "Voluntários acessam dados da comunidade e devem assumir compromisso formal de sigilo.",
+            "tarefa_remediacao": "Incluir termo de confidencialidade LGPD nos cadastros de voluntários e doadores",
+        },
+        {
+            "categoria": "Dispositivos da Equipe",
+            "pergunta": "Os computadores e celulares usados pela ONG possuem senha de bloqueio, antimalware ativo e atualizações automáticas habilitadas?",
+            "peso": 2,
+            "justificativa_curta": "Higiene básica de dispositivos reduz vulnerabilidades exploradas por sequestro de dados.",
+            "tarefa_remediacao": "Ativar bloqueio automático, antimalware e atualizações nos equipamentos da equipe",
+        },
+    ]
+    for extra in padrao_extra:
+        if len(banco) >= quantidade:
+            break
+        banco.append(extra)
+
+    resultado = []
+    for idx, item in enumerate(banco[:quantidade], start=1):
+        pid = f"dyn-fb-{idx}"
+        resultado.append({
+            "id": pid,
+            "pergunta_id": pid,
+            "pergunta": item["pergunta"],
+            "enunciado": item["pergunta"],
+            "categoria": item["categoria"],
+            "peso": item["peso"],
+            "justificativa_curta": item["justificativa_curta"],
+            "obrigatoria": True,
+            "origem": "fallback",
+            "tarefa_remediacao": item["tarefa_remediacao"],
+        })
+    return resultado
+
+
+def personalizar_plano_fallback(
+    perfil_ong: dict[str, Any],
+    nao_conformes: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Enriquece as tarefas do plano com o contexto da ONG quando o LLM estiver indisponível."""
+    publicos = ", ".join(perfil_ong.get("publico_atendido") or [])
+    canais = ", ".join(perfil_ong.get("canais_coleta_dados") or [])
+    sufixo = ""
+    if publicos and canais:
+        sufixo = f" (foco em {publicos} via {canais})"
+    elif publicos:
+        sufixo = f" (foco em {publicos})"
+    elif canais:
+        sufixo = f" (foco em {canais})"
+
+    tarefas = []
+    for item in nao_conformes:
+        pid = str(item.get("pergunta_id") or "")
+        base = str(item.get("tarefa_remediacao") or f"Adequar controle {pid}").strip()
+        titulo = f"{base}{sufixo}" if sufixo and len(base) + len(sufixo) <= 155 else base[:155]
+        tarefas.append({"pergunta_id": pid, "titulo": titulo, "prazo_dias": 15})
+    return tarefas
+
+
+def executar_json_com_resiliencia(
+    simular_falha_llm: bool,
+    chamar_llm_json: Callable[[], Any],
+    fallback_fn: Callable[[], Any],
+) -> tuple[Any, str, float]:
+    """Executa chamada estruturada ao LLM com Circuit Breaker + Fallback sem travar o fluxo."""
+    t_inicio = time.perf_counter()
+    if simular_falha_llm or not circuit_breaker.allow_request():
+        res = fallback_fn()
+        lat_ms = round((time.perf_counter() - t_inicio) * 1000.0, 2)
+        telemetria.registrar("FALLBACK_RESILIENTE", lat_ms, retries=0, tokens_est=0)
+        return res, "FALLBACK_ESTRUTURADO", lat_ms
+
+    for tentativa in range(2):
+        try:
+            res = chamar_llm_json()
+            circuit_breaker.record_success()
+            lat_ms = round((time.perf_counter() - t_inicio) * 1000.0, 2)
+            telemetria.registrar("OLLAMA_DEEPHAT", lat_ms, retries=tentativa, tokens_est=240)
+            return res, "OLLAMA_DEEPHAT", lat_ms
+        except Exception:
+            circuit_breaker.record_failure()
+            if not circuit_breaker.allow_request():
+                break
+
+    res = fallback_fn()
+    lat_ms = round((time.perf_counter() - t_inicio) * 1000.0, 2)
+    telemetria.registrar("FALLBACK_RESILIENTE", lat_ms, retries=1, tokens_est=0)
+    return res, "FALLBACK_ESTRUTURADO", lat_ms
 

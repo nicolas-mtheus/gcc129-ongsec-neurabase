@@ -4,12 +4,22 @@ from __future__ import annotations
 from fastapi import FastAPI
 from pydantic import BaseModel
 
-from .chains import OLLAMA_BASE_URL, OLLAMA_MODEL, PERGUNTAS_AVALIACAO_RAG, executar_chain_consultoria
+from .chains import (
+    OLLAMA_BASE_URL,
+    OLLAMA_MODEL,
+    PERGUNTAS_AVALIACAO_RAG,
+    executar_chain_consultoria,
+    gerar_perguntas_dinamicas_llm,
+    personalizar_plano_acao_llm,
+)
 from .rag import rag_store
 from .resilience import (
     cache_respostas,
     circuit_breaker,
     executar_com_resiliencia,
+    executar_json_com_resiliencia,
+    gerar_perguntas_fallback_perfil,
+    personalizar_plano_fallback,
     telemetria,
 )
 from .tools import coletar_contexto_ong
@@ -32,6 +42,24 @@ class ComparacaoRagIn(BaseModel):
 
 class CircuitBreakerIn(BaseModel):
     acao: str  # abrir | fechar | limpar_cache
+
+
+class PerguntasDinamicasIn(BaseModel):
+    ong_id: str | None = None
+    nome_instituicao: str | None = None
+    descricao_atividades: str = ""
+    publico_atendido: list[str] = []
+    canais_coleta_dados: list[str] = []
+    quantidade: int = 5
+    simular_falha_llm: bool = False
+
+
+class PlanoAcaoPersonalizarIn(BaseModel):
+    ong_id: str = "ong-123"
+    perfil_ong: dict = {}
+    nao_conformes: list[dict] = []
+    score: int = 0
+    simular_falha_llm: bool = False
 
 
 @app.on_event("startup")
@@ -153,5 +181,49 @@ def controlar_circuit_breaker(body: CircuitBreakerIn):
         "acao_executada": acao,
         "circuit_breaker": circuit_breaker.snapshot(),
         "cache": {"hits": cache_respostas.hits, "misses": cache_respostas.misses},
+    }
+
+
+@app.post("/v1/ia/diagnostico/perguntas-dinamicas")
+def gerar_perguntas_dinamicas(body: PerguntasDinamicasIn):
+    perfil = {
+        "ong_id": body.ong_id,
+        "nome_instituicao": body.nome_instituicao or "Organização",
+        "descricao_atividades": body.descricao_atividades,
+        "publico_atendido": body.publico_atendido,
+        "canais_coleta_dados": body.canais_coleta_dados,
+    }
+    qtd = max(4, min(6, body.quantidade))
+    perguntas, modo, lat_ms = executar_json_com_resiliencia(
+        simular_falha_llm=body.simular_falha_llm,
+        chamar_llm_json=lambda: gerar_perguntas_dinamicas_llm(perfil, quantidade=qtd),
+        fallback_fn=lambda: gerar_perguntas_fallback_perfil(perfil, quantidade=qtd),
+    )
+    return {
+        "perguntas": perguntas,
+        "modo_geracao": modo,
+        "latencia_ms": lat_ms,
+        "modelo": OLLAMA_MODEL,
+    }
+
+
+@app.post("/v1/ia/plano-acao/personalizar")
+def personalizar_plano_acao(body: PlanoAcaoPersonalizarIn):
+    if not body.nao_conformes:
+        return {"tarefas": [], "modo_geracao": "VAZIO", "latencia_ms": 0.0}
+    perfil = dict(body.perfil_ong or {})
+    if not perfil.get("descricao_atividades") and body.ong_id:
+        ctx = coletar_contexto_ong(body.ong_id)
+        perfil = ctx.get("perfil_ong") or perfil
+    tarefas, modo, lat_ms = executar_json_com_resiliencia(
+        simular_falha_llm=body.simular_falha_llm,
+        chamar_llm_json=lambda: personalizar_plano_acao_llm(perfil, body.nao_conformes, body.score),
+        fallback_fn=lambda: personalizar_plano_fallback(perfil, body.nao_conformes),
+    )
+    return {
+        "tarefas": tarefas,
+        "modo_geracao": modo,
+        "latencia_ms": lat_ms,
+        "modelo": OLLAMA_MODEL,
     }
 

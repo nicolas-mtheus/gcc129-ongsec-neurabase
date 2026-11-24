@@ -16,6 +16,8 @@ data:
   BFF_GESTAO_URL: "http://bff-gestao:80"
   BFF_PUBLICO_URL: "http://bff-publico:80"
   WEB_GESTAO_URL: "http://web-gestao:80"
+  MOBILE_PUBLICO_URL: "http://mobile-publico:80"
+  REDIS_URL: "redis://redis:6379/0"
   ORG_DB_HOST: "org-db"
   ORG_DB_PORT: "5432"
   ORG_DB_NAME: "org_db"

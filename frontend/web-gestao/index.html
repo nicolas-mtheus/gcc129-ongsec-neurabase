@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ONGSec — Governança & Certificação LGPD</title>
+  <title>ONGSec — Adequação e Selo LGPD</title>
   <link rel="stylesheet" href="style.css">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%233b82f6'><path d='M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z'/></svg>">
 </head>
@@ -21,23 +21,23 @@
         <div class="brand-text">
           <div class="brand-title">
             <span class="highlight">ONG</span>Sec
-            <span class="version-tag">v3.0 • Microservices</span>
+            <span class="version-tag admin-only" style="display:none;">Painel Técnico ADMIN</span>
           </div>
-          <span class="brand-subtitle">Plataforma de Governança e Certificação LGPD</span>
+          <span class="brand-subtitle" id="brandSubtitle">Plataforma de Adequação e Selo LGPD</span>
         </div>
       </div>
 
       <div class="nav-right">
-        <div class="status-indicator" id="edgeStatus">
+        <div class="status-indicator admin-only" id="edgeStatus" style="display:none;">
           <span class="pulse-dot"></span>
           <span class="status-text">Gateway : Conectado</span>
         </div>
 
         <div class="user-profile" id="userProfile" style="display: none;">
-          <div class="avatar" id="userAvatar">MS</div>
+          <div class="avatar" id="userAvatar">ON</div>
           <div class="user-info">
-            <span class="user-name" id="userName">Maria da Silva</span>
-            <span class="user-role">Gestor LGPD • Associação Cuidar</span>
+            <span class="user-name" id="userName">Gestor</span>
+            <span class="user-role" id="userRoleLabel">Associação Cuidar</span>
           </div>
           <button id="btnLogout" class="btn-logout" title="Encerrar Sessão">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -52,36 +52,49 @@
   </header>
 
   <div class="layout-wrapper">
-    <!-- Sub-header with Navigation Tabs -->
-    <nav class="tabs-nav" id="mainTabs">
+    <!-- Sub-header com navegação condicional por perfil (GESTOR vs ADMIN) -->
+    <nav class="tabs-nav" id="mainTabs" style="display:none;">
       <div class="tabs-container">
-        <button class="tab-btn active" data-tab="tab-overview">
+        <!-- Abas do GESTOR -->
+        <button class="tab-btn gestor-only active" data-tab="tab-overview">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
           Visão Geral & Selo
         </button>
-        <button class="tab-btn" data-tab="tab-saga">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
-          Coreografia SAGA & Auditoria
+        <button class="tab-btn gestor-only" data-tab="tab-audit">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+          Diagnóstico LGPD
         </button>
-        <button class="tab-btn" data-tab="tab-public">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
-          Consulta Pública de Selos
+        <button class="tab-btn gestor-only" data-tab="tab-plan">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+          Plano de Ação
         </button>
-        <button class="tab-btn" data-tab="tab-architecture">
+        <button class="tab-btn gestor-only" data-tab="tab-ai">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+          Assistente de IA
+        </button>
+
+        <!-- Abas exclusivas do ADMIN -->
+        <button class="tab-btn admin-only" data-tab="tab-admin-debug" style="display:none;">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect><rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></svg>
           Topologia & Bancos
         </button>
-        <button class="tab-btn" data-tab="tab-ai">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a4 4 0 0 1 4 4v2h2a2 2 0 0 1 2 2v6a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4v-6a2 2 0 0 1 2-2h2V6a4 4 0 0 1 4-4z"></path><circle cx="9" cy="13" r="1"></circle><circle cx="15" cy="13" r="1"></circle></svg>
-          Assistente IA (RAG + LangChain)
+        <button class="tab-btn admin-only" data-tab="tab-admin-saga" style="display:none;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+          SAGA & Simulações
+        </button>
+        <button class="tab-btn admin-only" data-tab="tab-admin-ai" style="display:none;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a4 4 0 0 1 4 4v2h2a2 2 0 0 1 2 2v6a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4v-6a2 2 0 0 1 2-2h2V6a4 4 0 0 1 4-4z"></path></svg>
+          Debug IA (RAG & Resiliência)
+        </button>
+        <button class="tab-btn admin-only" data-tab="tab-public" style="display:none;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line></svg>
+          Consulta Pública CQRS
         </button>
       </div>
     </nav>
 
-    <!-- Main Content Container -->
     <main class="main-content">
-      
-      <!-- AUTH MODAL / BANNER (Shown when not logged in) -->
+      <!-- AUTH MODAL -->
       <section class="auth-overlay" id="authSection">
         <div class="auth-card">
           <div class="auth-header">
@@ -91,468 +104,481 @@
                 <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
               </svg>
             </div>
-            <h2>Acesso Restrito ao Gestor</h2>
-            <p>Autenticação via BFF Gestão com assinatura criptográfica JWT</p>
+            <h2>Acesse o Painel da sua ONG</h2>
+            <p>Entre com sua conta ou cadastre sua instituição gratuitamente</p>
+          </div>
+
+          <div class="auth-mode-switch">
+            <button type="button" id="btnShowLogin" class="btn btn-primary btn-sm">Entrar</button>
+            <button type="button" id="btnShowRegister" class="btn btn-outline btn-sm">Cadastrar Nova ONG</button>
           </div>
 
           <form id="loginForm" class="auth-form" onsubmit="return false;">
             <div class="form-field">
-              <label for="email">E-mail Corporativo</label>
+              <label for="email">E-mail</label>
               <div class="input-wrapper">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
-                <input type="email" id="email" value="maria@associacaocuidar.org" required placeholder="gestor@ong.org">
+                <input type="email" id="email" value="" required placeholder="gestor@suaong.org">
               </div>
             </div>
 
             <div class="form-field">
-              <label for="senha">Credencial de Segurança</label>
+              <label for="senha">Senha</label>
               <div class="input-wrapper">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-                <input type="password" id="senha" value="senha-segura-123" required placeholder="••••••••••••">
+                <input type="password" id="senha" value="" required placeholder="••••••••">
               </div>
             </div>
 
             <div class="quick-credentials">
-              <span class="quick-label">Credenciais de Demonstração:</span>
+              <span class="quick-label">Acesso rápido de demonstração:</span>
               <button type="button" class="btn-chip" id="btnFillDemo">
-                ⚡ Usar Gestor Demo (Maria da Silva)
+                ⚡ Preencher Gestor Demo (Associação Cuidar)
               </button>
             </div>
 
             <button type="submit" id="btnLogin" class="btn btn-primary btn-block">
-              <span class="btn-text">Autenticar no BFF Gestão</span>
+              <span class="btn-text">Entrar</span>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
             </button>
           </form>
 
-          <div class="auth-footer">
-            <span class="badge-lock">🔒 Protegido com Argon2id + JWT HS256</span>
-          </div>
+          <form id="registerForm" class="auth-form" style="display: none;" onsubmit="return false;">
+            <div class="form-field">
+              <label for="regNome">Nome da ONG / Instituição</label>
+              <div class="input-wrapper">
+                <input type="text" id="regNome" required placeholder="Ex.: Instituto Esperança Viva" style="padding-left:0.85rem;">
+              </div>
+            </div>
+            <div class="form-field">
+              <label for="regCnpj">CNPJ (14 dígitos, apenas números)</label>
+              <div class="input-wrapper">
+                <input type="text" id="regCnpj" required maxlength="14" pattern="\d{14}" placeholder="Ex.: 98765432000110" style="padding-left:0.85rem;">
+              </div>
+            </div>
+            <div class="form-field">
+              <label for="regResp">Responsável Legal</label>
+              <div class="input-wrapper">
+                <input type="text" id="regResp" required placeholder="Ex.: João Pereira" style="padding-left:0.85rem;">
+              </div>
+            </div>
+            <div class="form-field">
+              <label for="regEmail">E-mail do Gestor</label>
+              <div class="input-wrapper">
+                <input type="email" id="regEmail" required placeholder="joao@esperancaviva.org" style="padding-left:0.85rem;">
+              </div>
+            </div>
+            <div class="form-field">
+              <label for="regSenha">Senha (mín. 8 caracteres)</label>
+              <div class="input-wrapper">
+                <input type="password" id="regSenha" required minlength="8" placeholder="••••••••" style="padding-left:0.85rem;">
+              </div>
+            </div>
+            <button type="submit" id="btnRegister" class="btn btn-primary btn-block">
+              <span class="btn-text">Criar Conta da ONG</span>
+            </button>
+          </form>
         </div>
       </section>
 
-      <!-- TAB 1: VISÃO GERAL & SELO -->
-      <section class="tab-pane active" id="tab-overview">
-        <!-- Action Bar -->
+      <!-- ========================================================= -->
+      <!-- TELAS DO GESTOR (INTERFACE LIMPA, SEM ELEMENTOS TÉCNICOS) -->
+      <!-- ========================================================= -->
+
+      <!-- GESTOR TAB 1: VISÃO GERAL & SELO -->
+      <section class="tab-pane" id="tab-overview">
         <div class="toolbar">
           <div class="toolbar-title">
-            <h2>Status de Conformidade & Governança</h2>
-            <span class="toolbar-subtitle">Monitoramento em tempo real dos serviços de auditoria e certificação</span>
+            <h2 id="overviewGreeting">Painel da Instituição</h2>
+            <span class="toolbar-subtitle">Acompanhe sua adequação à LGPD e conquiste o Selo Digital de Confiança</span>
           </div>
-          <div class="toolbar-actions">
-            <button id="btnAtualizar" class="btn btn-outline" title="Recarregar dados do BFF">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
-              Atualizar Dados
-            </button>
-            <button id="btnRevogar" class="btn btn-danger-outline" title="Executar ação HATEOAS de revogação">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
-              Revogar Selo
-            </button>
+          <div class="toolbar-actions" style="flex-wrap:wrap;">
+            <button id="btnGoDiagnostico" class="btn btn-primary">📝 Iniciar / Refazer Diagnóstico</button>
+            <button id="btnGoPlano" class="btn btn-outline">📋 Ver Plano de Ação</button>
           </div>
         </div>
 
-        <!-- Metrics KPI Cards Grid -->
         <div class="kpi-grid">
           <div class="kpi-card card-seal">
             <div class="kpi-header">
-              <span class="kpi-label">Selo de Conformidade</span>
+              <span class="kpi-label">Selo Digital LGPD</span>
               <span class="kpi-icon-seal">🛡️</span>
             </div>
             <div class="kpi-body">
               <div class="kpi-main-val">
-                <span class="status-pill status-active" id="statusSelo">ATIVO</span>
+                <span class="status-pill status-active" id="statusSelo">PENDENTE</span>
               </div>
               <div class="kpi-meta">
-                <span>Certificado ID:</span>
-                <code class="code-id" id="idSelo">CERT-2026-998</code>
+                <span>Certificado:</span>
+                <code class="code-id" id="idSelo">—</code>
               </div>
             </div>
           </div>
 
           <div class="kpi-card">
             <div class="kpi-header">
-              <span class="kpi-label">Score de Auditoria LGPD</span>
+              <span class="kpi-label">Nível de Conformidade</span>
               <svg class="kpi-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
             </div>
             <div class="kpi-body">
               <div class="score-display">
-                <span class="score-number" id="scoreAuditoria">92%</span>
+                <span class="score-number" id="scoreAuditoria">0%</span>
                 <div class="progress-bar-bg">
-                  <div class="progress-bar-fill" id="scoreBar" style="width: 92%;"></div>
+                  <div class="progress-bar-fill" id="scoreBar" style="width: 0%;"></div>
                 </div>
               </div>
-              <span class="score-subtext">Classificação: <strong>Elevada Conformidade</strong></span>
+              <span class="score-subtext" id="scoreTextoStatus">Mínimo recomendado: 80%</span>
             </div>
           </div>
 
           <div class="kpi-card">
             <div class="kpi-header">
-              <span class="kpi-label">Tarefas de Remediação</span>
-              <svg class="kpi-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+              <span class="kpi-label">Pendências do Plano</span>
+              <svg class="kpi-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path></svg>
             </div>
             <div class="kpi-body">
               <div class="kpi-main-val">
-                <span class="task-count" id="tarefasPendentes">2</span>
-                <span class="task-unit">pendentes</span>
+                <span class="task-count" id="tarefasPendentes">0</span>
+                <span class="task-unit">pendente(s)</span>
               </div>
-              <span class="kpi-meta-text">Gerenciadas pelo <code>task-service</code></span>
+              <span class="kpi-meta-text" id="proximoPassoTexto">Responda o diagnóstico para gerar seu plano.</span>
             </div>
           </div>
 
           <div class="kpi-card">
             <div class="kpi-header">
-              <span class="kpi-label">Organização Auditada</span>
+              <span class="kpi-label">Sua Organização</span>
               <svg class="kpi-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
             </div>
             <div class="kpi-body">
-              <div class="org-name-val" id="orgNome">Associação Cuidar</div>
+              <div class="org-name-val" id="orgNome">—</div>
               <div class="kpi-meta">
                 <span>Responsável:</span>
-                <strong id="responsavelLegal">Maria da Silva</strong>
+                <strong id="responsavelLegal">—</strong>
               </div>
-              <div class="kpi-meta">
-                <span>Identificador:</span>
-                <code class="code-id" id="ongId">ong-123</code>
+              <div style="margin-top:0.65rem; display:flex; gap:0.4rem; flex-wrap:wrap;">
+                <button id="btnEditarPerfilOng" class="btn btn-outline" style="padding:0.28rem 0.6rem; font-size:0.74rem;">🧭 Perfil da ONG</button>
+                <button id="btnEditarNomeOng" class="btn btn-outline" style="padding:0.28rem 0.6rem; font-size:0.74rem;">✏️ Renomear ONG</button>
+                <a id="linkPortalPublico" href="/publico/" target="_blank" class="btn btn-outline" style="padding:0.28rem 0.6rem; font-size:0.74rem; text-decoration:none;">📱 Página Pública</a>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- Certificate Showcase & HATEOAS Panel -->
-        <div class="dashboard-split">
-          <!-- Official Seal Visual Banner -->
-          <div class="card certificate-hero">
-            <div class="cert-header">
-              <div class="cert-logo-wrapper">
-                <div class="cert-seal-badge">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path>
-                  </svg>
-                </div>
-                <div>
-                  <h3>Certificado Oficial de Conformidade LGPD</h3>
-                  <span class="cert-subtitle">Emitido pelo <code>badge-service</code> sob consenso distribuído</span>
-                </div>
+        <div class="card certificate-hero">
+          <div class="cert-header">
+            <div class="cert-logo-wrapper">
+              <div class="cert-seal-badge">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path>
+                </svg>
               </div>
-              <div class="cert-stamp">VERIFICADO</div>
-            </div>
-
-            <div class="cert-body">
-              <p class="cert-text">
-                Certificamos que a instituição <strong id="certOrg">Associação Cuidar</strong> completou satisfatoriamente as etapas de diagnóstico de privacidade, remediação de dados sensíveis e auditoria de controles de acesso conforme as diretrizes da Lei Geral de Proteção de Dados (Lei 13.709/2018).
-              </p>
-
-              <div class="cert-details-grid">
-                <div class="cert-detail-item">
-                  <span class="d-label">Validade Criptográfica</span>
-                  <span class="d-val">Ativa (Ano Vigente 2026)</span>
-                </div>
-                <div class="cert-detail-item">
-                  <span class="d-label">Algoritmo de Emissão</span>
-                  <span class="d-val">Consenso SAGA Orquestrado</span>
-                </div>
-                <div class="cert-detail-item">
-                  <span class="d-label">Endpoint de Verificação</span>
-                  <span class="d-val"><code>/api/publico/selos/ong-123</code></span>
-                </div>
+              <div>
+                <h3>Certificado de Conformidade LGPD</h3>
+                <span class="cert-subtitle" id="certSubtitle">Acompanhe os requisitos para conquistar e divulgar seu selo</span>
               </div>
             </div>
+            <div class="cert-stamp" id="certStamp">EM ADEQUAÇÃO</div>
           </div>
 
-          <!-- Hypermedia HATEOAS Inspector -->
-          <div class="card hateoas-card">
-            <div class="card-title-bar">
-              <div class="title-with-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
-                <h3>Links HATEOAS Disponíveis</h3>
-              </div>
-              <span class="badge-tag">REST Level 3</span>
-            </div>
-            <p class="card-desc">Controles de hipermídia injetados dinamicamente pelo BFF Gestão:</p>
-
-            <div class="hateoas-list" id="hateoasList">
-              <!-- Rendered via JS -->
+          <div class="cert-body">
+            <p class="cert-text" id="certBodyText">
+              A instituição <strong id="certOrg">—</strong> está em jornada de adequação à Lei Geral de Proteção de Dados (Lei 13.709/2018). Conclua o Diagnóstico LGPD com ao menos 80% de conformidade e finalize todas as ações pendentes para conquistar o selo verificável por doadores.
+            </p>
+            <div style="display:flex; gap:0.75rem; flex-wrap:wrap; margin-top:1rem;">
+              <button id="btnSolicitarSeloGestor" class="btn btn-primary" style="display:none;">🛡️ Solicitar Selo de Conformidade</button>
+              <a id="btnVerSeloPublico" href="/publico/" target="_blank" class="btn btn-outline" style="display:none; text-decoration:none;">🔗 Ver Selo Público para Doadores</a>
             </div>
           </div>
         </div>
       </section>
 
-      <!-- TAB 2: COREOGRAFIA SAGA & AUDITORIA -->
-      <section class="tab-pane" id="tab-saga">
+      <!-- GESTOR TAB 2: DIAGNÓSTICO LGPD (PASSO 0 + WIZARD PASSO A PASSO) -->
+      <section class="tab-pane" id="tab-audit">
         <div class="toolbar">
           <div class="toolbar-title">
-            <h2>Transação Distribuída — Padrão SAGA Orquestrada</h2>
-            <span class="toolbar-subtitle">Execução ao vivo via <code>saga-orchestrator</code>: caminho feliz e falha com compensação</span>
+            <h2>Diagnóstico LGPD Guiado</h2>
+            <span class="toolbar-subtitle">Responda passo a passo para avaliar a segurança da sua ONG e gerar seu Plano de Ação</span>
           </div>
-          <div class="toolbar-actions" style="flex-wrap: wrap;">
-            <button id="btnSagaSucesso" class="btn btn-primary" title="Executa a SAGA em caminho feliz e emite selo ATIVO">
-              ✅ Executar SAGA (Caminho Feliz)
-            </button>
-            <button id="btnSagaFalha" class="btn btn-danger-outline" title="Provoca falha no badge-service e aciona compensação no task-service">
-              💥 Provocar Falha na SAGA (Compensar)
-            </button>
-            <button id="btnConcluirTarefas" class="btn btn-outline" title="Conclui tarefas reabertas pela compensação">
-              🔧 Concluir Tarefas Reabertas
-            </button>
+          <div class="toolbar-actions">
+            <button type="button" id="btnAuditEditarPerfil" class="btn btn-outline btn-sm" style="display:none;">🧭 Editar Perfil da ONG</button>
           </div>
         </div>
 
-        <!-- Live Tasks State (task-service) -->
-        <div class="card" style="margin-bottom: 1.25rem;">
+        <!-- Passo 0: Conte sobre a sua ONG (exibido quando perfil_completo === false) -->
+        <div class="card perfil-card" id="perfilPasso0Card" style="display:none;">
+          <div class="perfil-card-header">
+            <span class="badge-tag">Passo Inicial</span>
+            <h3>Conte sobre a sua ONG</h3>
+            <p>Com base na rotina e nos canais da sua instituição, vamos montar perguntas sob medida para o seu Diagnóstico LGPD.</p>
+          </div>
+
+          <form id="passo0Form" onsubmit="return false;">
+            <div class="form-field">
+              <label for="passo0Descricao">O que sua ONG faz no dia a dia e quais serviços presta?</label>
+              <textarea id="passo0Descricao" class="perfil-textarea" rows="3" required placeholder="Ex.: Oferecemos reforço escolar, atendimento psicológico gratuito para crianças e campanhas mensais de arrecadação com doadores locais."></textarea>
+            </div>
+
+            <div class="form-field">
+              <label>Público atendido</label>
+              <div class="checkbox-chips-grid" id="passo0PublicoGrid">
+                <label class="chip-checkbox"><input type="checkbox" name="passo0Publico" value="Crianças/Adolescentes"><span>Crianças/Adolescentes</span></label>
+                <label class="chip-checkbox"><input type="checkbox" name="passo0Publico" value="Idosos"><span>Idosos</span></label>
+                <label class="chip-checkbox"><input type="checkbox" name="passo0Publico" value="Pacientes/Saúde"><span>Pacientes/Saúde</span></label>
+                <label class="chip-checkbox"><input type="checkbox" name="passo0Publico" value="Comunidade Geral"><span>Comunidade Geral</span></label>
+                <label class="chip-checkbox"><input type="checkbox" name="passo0Publico" value="Animais/Meio Ambiente"><span>Animais/Meio Ambiente</span></label>
+                <label class="chip-checkbox"><input type="checkbox" name="passo0Publico" value="Doadores/Voluntários"><span>Doadores/Voluntários</span></label>
+              </div>
+            </div>
+
+            <div class="form-field">
+              <label>Como vocês coletam dados hoje?</label>
+              <div class="checkbox-chips-grid" id="passo0CanaisGrid">
+                <label class="chip-checkbox"><input type="checkbox" name="passo0Canais" value="Formulários em papel"><span>Formulários em papel</span></label>
+                <label class="chip-checkbox"><input type="checkbox" name="passo0Canais" value="WhatsApp"><span>WhatsApp</span></label>
+                <label class="chip-checkbox"><input type="checkbox" name="passo0Canais" value="Site próprio"><span>Site próprio</span></label>
+                <label class="chip-checkbox"><input type="checkbox" name="passo0Canais" value="Redes Sociais"><span>Redes Sociais</span></label>
+                <label class="chip-checkbox"><input type="checkbox" name="passo0Canais" value="Planilhas"><span>Planilhas</span></label>
+              </div>
+            </div>
+
+            <div class="perfil-form-footer">
+              <button type="submit" id="btnSalvarPasso0" class="btn btn-primary">Salvar Perfil e Iniciar Diagnóstico →</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Estado de carregamento amigável ao montar diagnóstico personalizado -->
+        <div class="card wizard-loading-card" id="wizardLoadingCard" style="display:none;">
+          <div class="loading-spinner"></div>
+          <h3 id="wizardLoadingTitle">Personalizando seu diagnóstico LGPD com base no perfil da ONG...</h3>
+          <p id="wizardLoadingSubtitle">Isso leva apenas alguns instantes. Estamos preparando perguntas alinhadas ao público e aos canais da sua instituição.</p>
+        </div>
+
+        <div class="card wizard-card" id="wizardCard" style="display:none;">
+          <div class="wizard-progress-header">
+            <span id="wizardStepLabel" class="wizard-step-label">Pergunta 1 de 10</span>
+            <span id="wizardCategoryBadge" class="badge-tag">Governança & ANPD</span>
+          </div>
+          <div class="progress-bar-bg" style="margin:0.65rem 0 1.35rem 0;">
+            <div class="progress-bar-fill" id="wizardProgressFill" style="width: 10%;"></div>
+          </div>
+
+          <div id="wizardBody">
+            <h3 id="wizardQuestionText" class="wizard-question-title">Carregando diagnóstico...</h3>
+            <p id="wizardJustification" class="wizard-justification" style="display:none;"></p>
+            <div class="wizard-options">
+              <button type="button" class="wizard-option-btn" data-val="SIM">
+                <span class="opt-emoji">✅</span>
+                <div>
+                  <strong>Sim, já aplicamos</strong>
+                  <small>Este controle já faz parte da rotina da ONG</small>
+                </div>
+              </button>
+              <button type="button" class="wizard-option-btn" data-val="NAO">
+                <span class="opt-emoji">⚠️</span>
+                <div>
+                  <strong>Ainda não aplicamos</strong>
+                  <small>Incluir orientação automática no meu Plano de Ação</small>
+                </div>
+              </button>
+              <button type="button" class="wizard-option-btn" data-val="NAO_SE_APLICA">
+                <span class="opt-emoji">➖</span>
+                <div>
+                  <strong>Não se aplica</strong>
+                  <small>Não tratamos esse tipo de dado na instituição</small>
+                </div>
+              </button>
+            </div>
+          </div>
+
+          <div class="wizard-footer">
+            <button type="button" id="btnWizardPrev" class="btn btn-outline">← Voltar</button>
+            <div style="display:flex; gap:0.65rem;">
+              <button type="button" id="btnWizardNext" class="btn btn-outline">Próxima →</button>
+              <button type="button" id="btnEnviarDiagnostico" class="btn btn-primary" style="display:none;">✅ Concluir Diagnóstico</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- GESTOR TAB 3: PLANO DE AÇÃO (SEM JARGÃO SAGA) -->
+      <section class="tab-pane" id="tab-plan">
+        <div class="toolbar">
+          <div class="toolbar-title">
+            <h2>Plano de Ação de Conformidade</h2>
+            <span class="toolbar-subtitle">Resolva as pendências geradas pelo seu diagnóstico e libere o Selo Digital da ONG</span>
+          </div>
+          <div class="toolbar-actions">
+            <button id="btnSolicitarSeloPlano" class="btn btn-primary" style="display:none;">🛡️ Conquistar Selo Digital</button>
+          </div>
+        </div>
+
+        <div id="auditResultadoBanner" class="card plan-highlight-banner" style="display:none; margin-bottom:1.15rem;"></div>
+
+        <div class="card">
+          <div class="card-title-bar">
+            <h3>Ações Recomendadas</h3>
+            <span class="badge-count" id="gestorPlanoBadge">0 pendente(s)</span>
+          </div>
+          <div id="gestorTarefasList" class="tasks-live-grid">
+            <span style="color:var(--text-dim); font-size:0.86rem;">Responda ao Diagnóstico LGPD para visualizar seu plano personalizado.</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- GESTOR TAB 4: ASSISTENTE DE IA (CHAT LIMPO) -->
+      <section class="tab-pane" id="tab-ai">
+        <div class="toolbar">
+          <div class="toolbar-title">
+            <h2>Assistente de IA LGPD</h2>
+            <span class="toolbar-subtitle">Tire dúvidas e gere documentos personalizados com base nos dados reais da sua ONG</span>
+          </div>
+          <div class="toolbar-actions">
+            <button id="btnIaExportarPdf" class="btn btn-outline">🖨️ Imprimir / Salvar PDF</button>
+          </div>
+        </div>
+
+        <div class="card chat-shell">
+          <div class="chat-suggestions">
+            <span class="chat-sug-label">Sugestões rápidas:</span>
+            <button type="button" class="btn-chip gestor-chat-sug" data-q="Como adequar meu formulário de doações à LGPD?">Como adequar meu formulário de doações?</button>
+            <button type="button" class="btn-chip gestor-chat-sug" data-q="O que devo priorizar no meu plano de ação agora com base na situação atual da ONG?">O que priorizar no meu plano de ação?</button>
+            <button type="button" class="btn-chip gestor-chat-sug" data-q="Crie uma minuta simples e clara de Política de Privacidade personalizada para nossa ONG.">Gerar Política de Privacidade da ONG</button>
+          </div>
+
+          <div id="gestorChatHistory" class="chat-history">
+            <div class="chat-msg chat-bot">
+              <strong>Consultor LGPD</strong>
+              <p>Olá! Já estou conectado aos dados atuais da sua instituição. Escolha uma sugestão acima ou escreva sua dúvida abaixo.</p>
+            </div>
+          </div>
+
+          <div id="aiVincularTarefaRow" class="ai-action-row" style="display:none; padding:0.65rem 0; border-top:1px solid var(--border-subtle);">
+            <select id="aiTargetTaskSelect" class="ai-select" style="max-width:380px;"></select>
+            <button id="btnIaSalvarEvidencia" class="btn btn-primary">📎 Anexar Resposta e Concluir Tarefa</button>
+          </div>
+
+          <form id="gestorChatForm" class="chat-input-bar" onsubmit="return false;">
+            <input type="text" id="gestorChatInput" placeholder="Pergunte sobre LGPD, políticas de privacidade ou ações do plano..." required />
+            <button type="submit" id="btnGestorChatSend" class="btn btn-primary">Enviar</button>
+          </form>
+        </div>
+      </section>
+
+      <!-- ========================================================= -->
+      <!-- TELAS EXCLUSIVAS DO ADMIN (PAINEL TÉCNICO E DEBUG)        -->
+      <!-- ========================================================= -->
+
+      <!-- ADMIN TAB 1: TOPOLOGIA, BANCOS & HATEOAS -->
+      <section class="tab-pane" id="tab-admin-debug">
+        <div class="toolbar">
+          <div class="toolbar-title">
+            <h2>Painel Técnico (ADMIN) — Topologia & Bancos Isolados</h2>
+            <span class="toolbar-subtitle">Inspeção ao vivo dos 16 containers, Database per Service e contratos HATEOAS</span>
+          </div>
+          <div class="toolbar-actions" style="flex-wrap:wrap;">
+            <button id="btnAtualizarAdmin" class="btn btn-outline">🔄 Recarregar Estado</button>
+            <button id="btnEvidenciaBancos" class="btn btn-primary">🗄️ Inspecionar Bancos Isolados</button>
+          </div>
+        </div>
+
+        <div class="card" style="margin-bottom:1.25rem;">
+          <div class="card-title-bar">
+            <h3>Evidência ao Vivo — Bancos Separados por Serviço</h3>
+            <span class="badge-tag">4 PostgreSQL + SAGA + Redis</span>
+          </div>
+          <div id="bancosEvidenciaGrid" class="db-evidence-grid">
+            <span style="color:var(--text-dim); font-size:0.85rem;">Clique em "Inspecionar Bancos Isolados" para consultar cada instância em tempo real.</span>
+          </div>
+        </div>
+
+        <div class="card hateoas-card" style="margin-bottom:1.25rem;">
+          <div class="card-title-bar">
+            <h3>Links HATEOAS & Rotas Expostas pelo BFF</h3>
+            <span class="badge-tag">REST Level 3</span>
+          </div>
+          <div class="hateoas-list" id="hateoasList"></div>
+        </div>
+
+        <div class="card topo-card">
+          <div class="topo-grid">
+            <div class="topo-layer edge-layer">
+              <div class="layer-header"><span class="layer-tag">Borda</span><h4>Nginx API Gateway + Frontends</h4></div>
+              <div class="topo-item highlight-box">
+                <strong>gateway • web-gestao • mobile-publico</strong>
+                <p>Roteia <code>/gestao/</code>, <code>/publico/</code>, <code>/api/gestao/</code> e <code>/api/publico/</code> com Rate Limit e <code>X-Correlation-ID</code>.</p>
+              </div>
+            </div>
+            <div class="topo-layer domain-layer">
+              <div class="layer-header"><span class="layer-tag">Serviços de Domínio + Orquestrador + IA + Redis</span><h4>Database per Service</h4></div>
+              <div class="domain-pairs">
+                <div class="pair-card"><div class="srv">org-service:8000</div><div class="connector">⮂ org-data ⮂</div><div class="db">org-db (Postgres 16)</div></div>
+                <div class="pair-card"><div class="srv">audit-service:8000</div><div class="connector">⮂ audit-data ⮂</div><div class="db">audit-db (Postgres 16)</div></div>
+                <div class="pair-card"><div class="srv">task-service:8000</div><div class="connector">⮂ task-data ⮂</div><div class="db">task-db (Postgres 16)</div></div>
+                <div class="pair-card"><div class="srv">badge-service:8000</div><div class="connector">⮂ badge-data ⮂</div><div class="db">badge-db (Escrita + CQRS)</div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ADMIN TAB 2: SAGA & SIMULAÇÕES -->
+      <section class="tab-pane" id="tab-admin-saga">
+        <div class="toolbar">
+          <div class="toolbar-title">
+            <h2>Monitoramento da SAGA Orquestrada & Simulações</h2>
+            <span class="toolbar-subtitle">Execução controlada de caminho feliz, falha com compensação e simulação de diagnóstico</span>
+          </div>
+          <div class="toolbar-actions" style="flex-wrap:wrap;">
+            <button id="btnSagaSucesso" class="btn btn-primary">✅ Executar SAGA (Caminho Feliz)</button>
+            <button id="btnSagaFalha" class="btn btn-danger-outline">💥 Provocar Falha na SAGA (Compensar)</button>
+            <button id="btnAdminRevogarSelo" class="btn btn-danger-outline">🚫 Revogar Selo (CQRS)</button>
+            <button id="btnConcluirTarefas" class="btn btn-outline">🔧 Concluir Todas Tarefas</button>
+            <button id="btnAdminSim100" class="btn btn-outline">⚡ Simular Diag 100%</button>
+            <button id="btnAdminSim80" class="btn btn-outline">🧪 Simular Diag 80%</button>
+          </div>
+        </div>
+
+        <div class="card" style="margin-bottom:1.25rem;">
           <div class="card-title-bar">
             <h3>Estado das Tarefas no <code>task-service</code> (<code>task-db</code>)</h3>
-            <span class="badge-count" id="sagaPlanoBadge">plano-1 • 0 pendentes</span>
+            <span class="badge-count" id="adminPlanoBadge">plano-1 • 0 pendente(s)</span>
           </div>
-          <div id="tarefasPlanoBox" class="tasks-live-grid">
-            <span style="color: var(--text-dim); font-size: 0.85rem;">Faça login para inspecionar as tarefas do plano-1.</span>
-          </div>
+          <div id="adminTarefasBox" class="tasks-live-grid"></div>
         </div>
 
-        <!-- Visual SAGA Pipeline -->
-        <div class="card saga-pipeline-card">
-          <div class="pipeline-header">
-            <h3>Fluxo de Emissão do Selo de Conformidade</h3>
-            <span class="badge-status-saga">3 de 3 Etapas Concluídas</span>
-          </div>
-
-          <div class="saga-stepper">
-            <div class="saga-step complete">
-              <div class="step-indicator">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>
-              </div>
-              <div class="step-content">
-                <span class="step-service">audit-service</span>
-                <span class="step-title">Diagnóstico Concluído</span>
-                <span class="step-desc">Varredura de bases, cálculo de score e geração do relatório de riscos.</span>
-              </div>
-            </div>
-
-            <div class="saga-connector active"></div>
-
-            <div class="saga-step complete">
-              <div class="step-indicator">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>
-              </div>
-              <div class="step-content">
-                <span class="step-service">task-service</span>
-                <span class="step-title">Tarefas Remediadas</span>
-                <span class="step-desc">Correções de segurança aplicadas e políticas obrigatórias validadas.</span>
-              </div>
-            </div>
-
-            <div class="saga-connector active"></div>
-
-            <div class="saga-step complete">
-              <div class="step-indicator">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>
-              </div>
-              <div class="step-content">
-                <span class="step-service">badge-service</span>
-                <span class="step-title">Selo Gerado</span>
-                <span class="step-desc">Geração do selo digital CERT-2026-998 e publicação no catálogo público.</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Raw Event Log Table -->
         <div class="card event-log-card">
           <div class="card-title-bar">
-            <h3>Eventos Registrados no BFF Gestão</h3>
-            <span class="badge-count" id="sagaEventsCount">3 eventos</span>
+            <h3>Histórico de Eventos da SAGA (<code>saga-orchestrator</code>)</h3>
+            <span class="badge-count" id="sagaEventsCount">0 evento(s)</span>
           </div>
-
           <div class="table-responsive">
             <table class="data-table">
               <thead>
-                <tr>
-                  <th>Ordem</th>
-                  <th>Microsserviço</th>
-                  <th>Evento de Domínio</th>
-                  <th>Status de Execução</th>
-                  <th>Compensação Necessária?</th>
-                </tr>
+                <tr><th>Ordem</th><th>Microsserviço</th><th>Evento</th><th>Status</th><th>Compensação?</th></tr>
               </thead>
-              <tbody id="sagaTableBody">
-                <!-- Rendered dynamically -->
-              </tbody>
+              <tbody id="sagaTableBody"></tbody>
             </table>
           </div>
         </div>
       </section>
 
-      <!-- TAB 3: CONSULTA PÚBLICA DE SELO -->
-      <section class="tab-pane" id="tab-public">
+      <!-- ADMIN TAB 3: DEBUG IA (RAG, LANGCHAIN & RESILIÊNCIA) -->
+      <section class="tab-pane" id="tab-admin-ai">
         <div class="toolbar">
           <div class="toolbar-title">
-            <h2>Simulador de Consulta Pública</h2>
-            <span class="toolbar-subtitle">Rota anônima consumida por cidadãos e doadores através do BFF Público</span>
+            <h2>Debug IA — RAG, LangChain Tools, Circuit Breaker & Latência</h2>
+            <span class="toolbar-subtitle">Painel exclusivo ADMIN para avaliação experimental do LLM distribuído</span>
           </div>
-        </div>
-
-        <div class="card public-query-card">
-          <div class="query-box">
-            <label for="inputPublicOngId">Informe o Identificador da Instituição (ONG):</label>
-            <div class="query-input-row">
-              <div class="input-wrapper">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                <input type="text" id="inputPublicOngId" value="ong-123" placeholder="Ex: ong-123">
-              </div>
-              <button id="btnConsultarPublico" class="btn btn-primary">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
-                Consultar via BFF Público
-              </button>
-            </div>
-            <span class="query-hint">Chamada realizada em: <code>GET /api/publico/selos/{ongId}</code> (Sem necessidade de autenticação)</span>
-          </div>
-
-          <div class="public-result" id="publicResultSection" style="display: none;">
-            <div class="public-badge-card">
-              <div class="p-card-header">
-                <div class="p-badge-icon">🛡️</div>
-                <div class="p-badge-title">
-                  <h4 id="pubNomeInstituicao">Associação Cuidar</h4>
-                  <span class="p-badge-tag" id="pubStatus">CERTIFICAÇÃO ATIVA</span>
-                </div>
-              </div>
-              <div class="p-card-body">
-                <p id="pubMensagem" class="p-message">Instituição verificada e em conformidade com as diretrizes da LGPD.</p>
-                <div class="p-meta-grid">
-                  <div>
-                    <span class="label">ID da Certificação:</span>
-                    <strong id="pubIdSelo">CERT-2026-998</strong>
-                  </div>
-                  <div>
-                    <span class="label">Data de Emissão:</span>
-                    <strong id="pubEmitidoEm">10/10/2026</strong>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Raw JSON inspector -->
-            <div class="json-preview">
-              <div class="json-header">
-                <span>Payload Retornado pelo BFF Público:</span>
-                <span class="http-status">HTTP 200 OK</span>
-              </div>
-              <pre><code id="pubRawJson">{}</code></pre>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- TAB 4: TOPOLOGIA DA SOLUÇÃO -->
-      <section class="tab-pane" id="tab-architecture">
-        <div class="toolbar">
-          <div class="toolbar-title">
-            <h2>Arquitetura de Microsserviços & Isolamento de Redes</h2>
-            <span class="toolbar-subtitle">14 Containers orquestrados com Orquestrador SAGA dedicado, Serviço de IA e Database-per-Service</span>
-          </div>
-          <div class="toolbar-actions">
-            <button id="btnEvidenciaBancos" class="btn btn-primary">
-              🗄️ Inspecionar Bancos Isolados ao Vivo
-            </button>
-          </div>
-        </div>
-
-        <div class="card" style="margin-bottom: 1.25rem;">
-          <div class="card-title-bar">
-            <h3>Evidência ao Vivo — Bancos Separados por Serviço (<code>Database per Service</code>)</h3>
-            <span class="badge-tag">4 PostgreSQL + Orquestrador</span>
-          </div>
-          <div id="bancosEvidenciaGrid" class="db-evidence-grid">
-            <span style="color: var(--text-dim); font-size: 0.85rem;">Clique em "Inspecionar Bancos Isolados ao Vivo" para consultar cada instância em tempo real.</span>
-          </div>
-        </div>
-
-        <div class="card topo-card">
-          <div class="topo-grid">
-            <!-- Borda -->
-            <div class="topo-layer edge-layer">
-              <div class="layer-header">
-                <span class="layer-tag">Camada de Borda (Edge)</span>
-                <h4>Nginx API Gateway (Porta 8080)</h4>
-              </div>
-              <div class="topo-item highlight-box">
-                <strong>gateway (Nginx Alpine)</strong>
-                <p>Única porta pública exposta (8080). Roteia /gestao/, /api/gestao/ e /api/publico/. Rate limiting, Correlation ID e Edge Healthcheck (/healthz).</p>
-              </div>
-            </div>
-
-            <!-- Camada de Aplicação / BFFs -->
-            <div class="topo-layer app-layer">
-              <div class="layer-header">
-                <span class="layer-tag">Camada de BFF & Frontend</span>
-                <h4>Rede: app-network</h4>
-              </div>
-              <div class="topo-nodes-grid">
-                <div class="topo-item">
-                  <strong>web-gestao</strong>
-                  <span>Nginx Alpine (Multi-stage)</span>
-                  <small>Porta 80 interna</small>
-                </div>
-                <div class="topo-item">
-                  <strong>bff-gestao</strong>
-                  <span>FastAPI + JWT Auth</span>
-                  <small>Porta 8000 interna</small>
-                </div>
-                <div class="topo-item">
-                  <strong>bff-publico</strong>
-                  <span>FastAPI (Público)</span>
-                  <small>Porta 8000 interna</small>
-                </div>
-              </div>
-            </div>
-
-            <!-- Camada de Microsserviços de Domínio -->
-            <div class="topo-layer domain-layer">
-              <div class="layer-header">
-                <span class="layer-tag">Serviços de Domínio & Bancos Dedicados</span>
-                <h4>Database-per-Service + Redes Isoladas</h4>
-              </div>
-              <div class="domain-pairs">
-                <div class="pair-card">
-                  <div class="srv">org-service:8000</div>
-                  <div class="connector">⮂ rede: org-data ⮂</div>
-                  <div class="db">org-db (PostgreSQL 16)</div>
-                </div>
-                <div class="pair-card">
-                  <div class="srv">audit-service:8000</div>
-                  <div class="connector">⮂ rede: audit-data ⮂</div>
-                  <div class="db">audit-db (PostgreSQL 16)</div>
-                </div>
-                <div class="pair-card">
-                  <div class="srv">task-service:8000</div>
-                  <div class="connector">⮂ rede: task-data ⮂</div>
-                  <div class="db">task-db (PostgreSQL 16)</div>
-                </div>
-                <div class="pair-card">
-                  <div class="srv">badge-service:8000</div>
-                  <div class="connector">⮂ rede: badge-data ⮂</div>
-                  <div class="db">badge-db (PostgreSQL 16)</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- TAB 5: ASSISTENTE IA (RAG + LANGCHAIN + RESILIÊNCIA) -->
-      <section class="tab-pane" id="tab-ai">
-        <div class="toolbar">
-          <div class="toolbar-title">
-            <h2>Consultor LGPD com IA (Ollama DeepHat + RAG + LangChain)</h2>
-            <span class="toolbar-subtitle">Base vetorial própria (ANPD, CERT.br, CIS IG1, SEBRAE), Tools reais e resiliência distribuída</span>
-          </div>
-          <div class="toolbar-actions" style="flex-wrap: wrap;">
+          <div class="toolbar-actions" style="flex-wrap:wrap;">
             <button id="btnIaMetricas" class="btn btn-outline">📊 Atualizar Métricas</button>
             <button id="btnIaSimularFalha" class="btn btn-danger-outline">⚡ Simular Falha LLM (Fallback + CB)</button>
             <button id="btnIaResetCb" class="btn btn-outline">🔄 Resetar Circuit Breaker</button>
           </div>
         </div>
 
-        <div class="ai-telemetry-bar" id="aiTelemetryBar">
+        <div class="ai-telemetry-bar">
           <div class="ai-pill"><span>Provedor:</span> <strong id="aiModeloTag">deephat:latest (Ollama)</strong></div>
           <div class="ai-pill"><span>Circuit Breaker:</span> <strong id="aiCbEstado">CLOSED</strong></div>
           <div class="ai-pill"><span>Modo:</span> <strong id="aiModoTag">—</strong></div>
@@ -560,93 +586,151 @@
           <div class="ai-pill"><span>Cache Hits:</span> <strong id="aiCacheTag">0</strong></div>
         </div>
 
-        <div class="card" style="margin-bottom: 1.25rem;">
+        <div class="card" style="margin-bottom:1.25rem;">
           <div class="ai-controls-grid">
             <div class="form-field">
-              <label for="aiPresetSelect">Perguntas Prontas (Avaliação RAG & Caso Real):</label>
+              <label for="aiPresetSelect">Perguntas de Avaliação RAG:</label>
               <select id="aiPresetSelect" class="ai-select">
-                <option value="Segundo a Resolução CD/ANPD nº 2/2022, uma ONG de pequeno porte precisa indicar um Encarregado (DPO) formal ou basta um canal de comunicação?">Q1 — Dispensa de DPO pela ANPD (ATPP)</option>
-                <option value="Quais itens obrigatórios a Política de Privacidade da Associação Cuidar deve conter para tratar dados de crianças e adolescentes?">Q2 — Política de Privacidade para Abrigo Infantil (Art. 14)</option>
-                <option value="Qual é a política de backup recomendada pela cartilha CERT.br e como devemos tratar planilhas de beneficiários enviadas por WhatsApp?">Q3 — Regra de Backup 3-2-1 e WhatsApp (CERT.br)</option>
-                <option value="Em quanto tempo devemos revogar as credenciais de ex-voluntários segundo o CIS Controls v8 IG1?">Q4 — Revogação de Credenciais de Voluntários (CIS IG1)</option>
-                <option value="Qual o score mínimo e a condição das tarefas no ONGSec para emitir o selo, e o que acontece com o score se a SAGA precisar compensar?">Q5 — Regras de Certificação ONGSec e SAGA</option>
-                <option value="Analise a situação atual da Associação Cuidar nos sistemas internos e redija uma minuta curta de Política de Privacidade personalizada para a ONG.">Tarefa Real — Gerar Política de Privacidade da Associação Cuidar</option>
+                <option value="Segundo a Resolução CD/ANPD nº 2/2022, uma ONG de pequeno porte precisa indicar um Encarregado (DPO) formal ou basta um canal de comunicação?">Q1 — Dispensa de DPO pela ANPD</option>
+                <option value="Quais itens obrigatórios a Política de Privacidade da Associação Cuidar deve conter para tratar dados de crianças e adolescentes?">Q2 — Política de Privacidade (Art. 14)</option>
+                <option value="Qual é a política de backup recomendada pela cartilha CERT.br e como devemos tratar planilhas de beneficiários enviadas por WhatsApp?">Q3 — Backup 3-2-1 e WhatsApp (CERT.br)</option>
+                <option value="Em quanto tempo devemos revogar as credenciais de ex-voluntários segundo o CIS Controls v8 IG1?">Q4 — Revogação de Credenciais (CIS IG1)</option>
+                <option value="Qual o score mínimo e a condição das tarefas no ONGSec para emitir o selo, e o que acontece com o score se a SAGA precisar compensar?">Q5 — Regras ONGSec e SAGA</option>
               </select>
             </div>
             <div class="form-field">
-              <label for="aiPerguntaInput">Pergunta / Solicitação ao Consultor IA:</label>
+              <label for="aiPerguntaInput">Prompt Técnico:</label>
               <textarea id="aiPerguntaInput" rows="2" class="ai-textarea">Segundo a Resolução CD/ANPD nº 2/2022, uma ONG de pequeno porte precisa indicar um Encarregado (DPO) formal ou basta um canal de comunicação?</textarea>
             </div>
             <div class="ai-action-row">
-              <label class="ai-check"><input type="checkbox" id="aiUsarRag" checked> Usar RAG (Base Vetorial)</label>
+              <label class="ai-check"><input type="checkbox" id="aiUsarRag" checked> Usar RAG</label>
               <label class="ai-check"><input type="checkbox" id="aiUsarCache" checked> Usar Cache</label>
-              <button id="btnIaConsultar" class="btn btn-primary">🤖 Consultar Assistente IA</button>
+              <button id="btnIaConsultar" class="btn btn-primary">🤖 Executar Chain</button>
               <button id="btnIaComparar" class="btn btn-outline">⚖️ Comparar COM RAG vs. SEM RAG</button>
             </div>
           </div>
         </div>
 
-        <div id="aiRespostaContainer" class="ai-results-grid" style="display: none;">
+        <div id="aiRespostaContainer" class="ai-results-grid" style="display:none;">
           <div class="card">
-            <div class="card-title-bar">
-              <h3>Resposta do Consultor IA (LangChain Chain)</h3>
-              <span class="badge-tag" id="aiModoBadge">OLLAMA</span>
-            </div>
+            <div class="card-title-bar"><h3>Resposta LLM</h3><span class="badge-tag" id="aiModoBadge">OLLAMA</span></div>
             <div id="aiRespostaTexto" class="ai-response-text"></div>
           </div>
-
           <div class="card">
-            <div class="card-title-bar">
-              <h3>LangChain Tools & Chunks Recuperados (RAG)</h3>
-              <span class="badge-count" id="aiChunksCount">0 chunks</span>
-            </div>
+            <div class="card-title-bar"><h3>LangChain Tools & Chunks RAG</h3><span class="badge-count" id="aiChunksCount">0 chunks</span></div>
             <div id="aiToolsResumo" class="ai-subpanel"></div>
             <div id="aiRagResumo" class="ai-subpanel"></div>
           </div>
         </div>
 
-        <div id="aiComparacaoContainer" class="card" style="display: none; margin-top: 1.25rem;">
-          <div class="card-title-bar">
-            <h3>Comparativo Qualitativo: COM RAG vs. SEM RAG</h3>
-            <span class="badge-tag">Avaliação Experimental</span>
-          </div>
+        <div id="aiComparacaoContainer" class="card" style="display:none; margin-top:1.25rem;">
+          <div class="card-title-bar"><h3>Comparativo COM RAG vs. SEM RAG</h3><span class="badge-tag">Avaliação</span></div>
           <div class="ai-compare-grid">
-            <div class="ai-compare-col">
-              <h4>✅ COM Recuperação (RAG + Base Normativa)</h4>
-              <div id="aiCompComRag" class="ai-response-text"></div>
-            </div>
-            <div class="ai-compare-col">
-              <h4>⚠️ SEM Recuperação (Apenas Conhecimento Base do Modelo)</h4>
-              <div id="aiCompSemRag" class="ai-response-text"></div>
-            </div>
+            <div class="ai-compare-col"><h4>✅ COM RAG</h4><div id="aiCompComRag" class="ai-response-text"></div></div>
+            <div class="ai-compare-col"><h4>⚠️ SEM RAG</h4><div id="aiCompSemRag" class="ai-response-text"></div></div>
           </div>
         </div>
 
-        <div id="aiMetricasContainer" class="card" style="margin-top: 1.25rem;">
-          <div class="card-title-bar">
-            <h3>Telemetria Distribuída: Latência Medida & Estimativa de Custo em Escala</h3>
-            <span class="badge-tag">Observabilidade LLM</span>
-          </div>
-          <div id="aiMetricasBox" class="ai-metrics-box">
-            <span style="color: var(--text-dim); font-size: 0.85rem;">Clique em "Atualizar Métricas" ou faça uma consulta para registrar latências reais.</span>
-          </div>
+        <div class="card" style="margin-top:1.25rem;">
+          <div class="card-title-bar"><h3>Telemetria Distribuída: Latência & Custo</h3><span class="badge-tag">Observabilidade</span></div>
+          <div id="aiMetricasBox" class="ai-metrics-box"></div>
         </div>
       </section>
 
+      <!-- ADMIN TAB 4: CONSULTA PÚBLICA CQRS -->
+      <section class="tab-pane" id="tab-public">
+        <div class="toolbar">
+          <div class="toolbar-title">
+            <h2>Simulador de Consulta Pública (CQRS)</h2>
+            <span class="toolbar-subtitle">Rota anônima <code>GET /api/publico/selos/{ongId}</code> consumida pelo Portal Mobile</span>
+          </div>
+          <div class="toolbar-actions">
+            <a href="/publico/" target="_blank" class="btn btn-primary" style="text-decoration:none;">📱 Abrir Portal Público (/publico/)</a>
+          </div>
+        </div>
+        <div class="card public-query-card">
+          <div class="query-box">
+            <label for="inputPublicOngId">Identificador da ONG:</label>
+            <div class="query-input-row">
+              <div class="input-wrapper"><input type="text" id="inputPublicOngId" value="ong-123" style="padding-left:0.85rem;"></div>
+              <button id="btnConsultarPublico" class="btn btn-primary">Consultar via BFF Público</button>
+            </div>
+          </div>
+          <div class="public-result" id="publicResultSection" style="display:none;">
+            <div class="public-badge-card">
+              <div class="p-card-header">
+                <div class="p-badge-icon">🛡️</div>
+                <div class="p-badge-title">
+                  <h4 id="pubNomeInstituicao">—</h4>
+                  <span class="p-badge-tag" id="pubStatus">—</span>
+                </div>
+              </div>
+              <div class="p-card-body">
+                <p id="pubMensagem" class="p-message"></p>
+                <div class="p-meta-grid">
+                  <div><span class="label">Certificado:</span><strong id="pubIdSelo">—</strong></div>
+                  <div><span class="label">Emissão:</span><strong id="pubEmitidoEm">—</strong></div>
+                </div>
+              </div>
+            </div>
+            <div class="json-preview">
+              <div class="json-header"><span>Payload CQRS:</span><span class="http-status">HTTP 200 OK</span></div>
+              <pre><code id="pubRawJson">{}</code></pre>
+            </div>
+          </div>
+        </div>
+      </section>
     </main>
 
-    <!-- Global Floating Toast Notification -->
     <div id="toast" class="toast-container"></div>
+  </div>
+
+  <!-- MODAL PARA EDITAR PERFIL DA ONG -->
+  <div class="modal-backdrop" id="perfilModalOverlay" style="display:none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Perfil da ONG</h3>
+        <button type="button" id="btnFecharModalPerfil" class="btn-icon-close" title="Fechar">✕</button>
+      </div>
+      <p class="modal-subtitle">Mantenha as informações atualizadas para personalizar o diagnóstico, o plano de ação e o assistente.</p>
+      <form id="modalPerfilForm" onsubmit="return false;">
+        <div class="form-field">
+          <label for="modalPerfilDescricao">O que sua ONG faz no dia a dia e quais serviços presta?</label>
+          <textarea id="modalPerfilDescricao" class="perfil-textarea" rows="3" required></textarea>
+        </div>
+        <div class="form-field">
+          <label>Público atendido</label>
+          <div class="checkbox-chips-grid">
+            <label class="chip-checkbox"><input type="checkbox" name="modalPublico" value="Crianças/Adolescentes"><span>Crianças/Adolescentes</span></label>
+            <label class="chip-checkbox"><input type="checkbox" name="modalPublico" value="Idosos"><span>Idosos</span></label>
+            <label class="chip-checkbox"><input type="checkbox" name="modalPublico" value="Pacientes/Saúde"><span>Pacientes/Saúde</span></label>
+            <label class="chip-checkbox"><input type="checkbox" name="modalPublico" value="Comunidade Geral"><span>Comunidade Geral</span></label>
+            <label class="chip-checkbox"><input type="checkbox" name="modalPublico" value="Animais/Meio Ambiente"><span>Animais/Meio Ambiente</span></label>
+            <label class="chip-checkbox"><input type="checkbox" name="modalPublico" value="Doadores/Voluntários"><span>Doadores/Voluntários</span></label>
+          </div>
+        </div>
+        <div class="form-field">
+          <label>Como vocês coletam dados hoje?</label>
+          <div class="checkbox-chips-grid">
+            <label class="chip-checkbox"><input type="checkbox" name="modalCanais" value="Formulários em papel"><span>Formulários em papel</span></label>
+            <label class="chip-checkbox"><input type="checkbox" name="modalCanais" value="WhatsApp"><span>WhatsApp</span></label>
+            <label class="chip-checkbox"><input type="checkbox" name="modalCanais" value="Site próprio"><span>Site próprio</span></label>
+            <label class="chip-checkbox"><input type="checkbox" name="modalCanais" value="Redes Sociais"><span>Redes Sociais</span></label>
+            <label class="chip-checkbox"><input type="checkbox" name="modalCanais" value="Planilhas"><span>Planilhas</span></label>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" id="btnCancelarModalPerfil" class="btn btn-outline">Cancelar</button>
+          <button type="submit" id="btnSalvarModalPerfil" class="btn btn-primary">Salvar e Atualizar Diagnóstico</button>
+        </div>
+      </form>
+    </div>
   </div>
 
   <footer class="app-footer">
     <div class="footer-container">
-      <div class="footer-left">
-        <strong>ONGSec Governance Platform</strong> — Trabalho Prático GCC129 (Engenharia de Software)
-      </div>
-      <div class="footer-right">
-        <span>Arquitetura de Microsserviços • Docker Compose & Kubernetes</span>
-      </div>
+      <div class="footer-left"><strong>ONGSec</strong> — Adequação e Certificação LGPD</div>
+      <div class="footer-right"><span id="footerRightText">Segurança da Informação para o Terceiro Setor</span></div>
     </div>
   </footer>
 

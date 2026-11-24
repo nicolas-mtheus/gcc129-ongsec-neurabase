@@ -25,8 +25,8 @@ app = FastAPI(title="ONGSec saga-orchestrator", version="1.0.0")
 
 class NovaSolicitacao(BaseModel):
     ong_id: str
-    diagnostico_id: str
-    plano_id: str
+    diagnostico_id: str = "auto"
+    plano_id: str = "auto"
 
 
 def erro(status: int, titulo: str, detalhe: str, request: Request) -> JSONResponse:
@@ -141,28 +141,51 @@ def iniciar_saga(
             if existente:
                 return _solicitacao_json(existente)
 
-    # Passo 1 e 2: validar pré-condições no audit-service e task-service
+    # Passo 1 e 2: resolver e validar pré-condições no audit-service e task-service
+    diagnostico_id = corpo.diagnostico_id
+    plano_id = corpo.plano_id
     try:
-        st_diag, diag = _chamar(
-            "GET",
-            f"{AUDIT_URL}/v1/diagnosticos/{corpo.diagnostico_id}",
-            x_correlation_id,
-            auth_ong_id=corpo.ong_id,
-        )
-        if st_diag != 200 or not diag or diag.get("status") != "CONCLUIDO" or diag.get("score") is None:
-            return erro(422, "Pré-condição não atendida", "Diagnóstico não concluído ou sem score", request)
+        if not diagnostico_id or diagnostico_id == "auto":
+            st_list, diag_list = _chamar(
+                "GET",
+                f"{AUDIT_URL}/v1/organizacoes/{corpo.ong_id}/diagnosticos?status=CONCLUIDO",
+                x_correlation_id,
+                auth_ong_id=corpo.ong_id,
+            )
+            itens = diag_list.get("itens", []) if st_list == 200 and isinstance(diag_list, dict) else []
+            if not itens:
+                return erro(422, "Pré-condição não atendida", "Nenhum diagnóstico concluído encontrado", request)
+            diag = itens[0]
+            diagnostico_id = diag["diagnostico_id"]
+        else:
+            st_diag, diag = _chamar(
+                "GET",
+                f"{AUDIT_URL}/v1/diagnosticos/{diagnostico_id}",
+                x_correlation_id,
+                auth_ong_id=corpo.ong_id,
+            )
+            if st_diag != 200 or not diag or diag.get("status") != "CONCLUIDO" or diag.get("score") is None:
+                return erro(422, "Pré-condição não atendida", "Diagnóstico não concluído ou sem score", request)
+
+        if diag.get("score") is None or diag.get("score") < 80:
+            return erro(422, "Score insuficiente", "Score mínimo de 80% não atingido para certificação", request)
 
         st_plano, plano = _chamar(
             "GET",
             f"{TASK_URL}/v1/organizacoes/{corpo.ong_id}/plano-atual",
             x_correlation_id,
         )
-        if st_plano != 200 or not plano or plano.get("plano_id") != corpo.plano_id or plano.get("tarefas_pendentes") != 0:
+        if not plano_id or plano_id == "auto":
+            if st_plano != 200 or not plano:
+                return erro(422, "Pré-condição não atendida", "Nenhum plano de ação encontrado", request)
+            plano_id = plano["plano_id"]
+        if st_plano != 200 or not plano or plano.get("plano_id") != plano_id or plano.get("tarefas_pendentes") != 0:
             return erro(422, "Pré-condição não atendida", "O plano ainda tem tarefas pendentes", request)
     except RuntimeError as e:
         return erro(503, "Serviço dependente indisponível", str(e), request)
 
     nome_instituicao = f"Organização {corpo.ong_id}"
+    cnpj = None
     try:
         st_org, org = _chamar(
             "GET",
@@ -170,8 +193,10 @@ def iniciar_saga(
             x_correlation_id,
             auth_ong_id=corpo.ong_id,
         )
-        if st_org == 200 and org and org.get("nome_instituicao"):
-            nome_instituicao = org["nome_instituicao"]
+        if st_org == 200 and org:
+            if org.get("nome_instituicao"):
+                nome_instituicao = org["nome_instituicao"]
+            cnpj = org.get("cnpj")
     except RuntimeError:
         pass
 
@@ -185,8 +210,8 @@ def iniciar_saga(
         sol = SolicitacaoSaga(
             solicitacao_id=sol_id,
             ong_id=corpo.ong_id,
-            diagnostico_id=corpo.diagnostico_id,
-            plano_id=corpo.plano_id,
+            diagnostico_id=diagnostico_id,
+            plano_id=plano_id,
             estado="SOLICITADA",
             historico=historico,
             idempotency_key=idempotency_key,
@@ -206,6 +231,7 @@ def iniciar_saga(
                 "ong_id": corpo.ong_id,
                 "solicitacao_id": sol_id,
                 "nome_instituicao": nome_instituicao,
+                "cnpj": cnpj,
                 "historico_saga_emissao": historico,
             },
             extra_headers=extra,
@@ -235,7 +261,7 @@ def iniciar_saga(
         # 2) Reabrir plano de tarefas no task-service (audit-service permanece intacto: fato histórico)
         reabriu = False
         try:
-            st_reab, _ = _chamar("POST", f"{TASK_URL}/v1/planos/{corpo.plano_id}/reabertura", x_correlation_id)
+            st_reab, _ = _chamar("POST", f"{TASK_URL}/v1/planos/{plano_id}/reabertura", x_correlation_id)
             reabriu = st_reab == 200
         except RuntimeError:
             pass

@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <meta name="theme-color" content="#0f172a" />
+  <title>ONGSec Público — Verificador de Selo LGPD</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="mobile-shell">
+    <header class="top-bar">
+      <div class="brand">
+        <span class="shield">🛡️</span>
+        <div>
+          <h1>ONGSec <span class="tag">Público</span></h1>
+          <p>Transparência e Conformidade LGPD</p>
+        </div>
+      </div>
+      <a href="/gestao/" class="gestao-link">Sou Gestor →</a>
+    </header>
+
+    <main class="content">
+      <!-- View 1: Explorar ONGs -->
+      <section id="view-explore" class="view active">
+        <div class="hero-card">
+          <h2>Doe com confiança</h2>
+          <p>Pesquise por nome, CNPJ ou código da ONG para conferir em tempo real o Selo Digital LGPD (via BFF Público + CQRS).</p>
+          <div class="search-box">
+            <input id="searchInput" type="search" placeholder="Buscar ONG, CNPJ ou ID (ex.: Cuidar)..." />
+            <button id="btnSearch" type="button">Buscar</button>
+          </div>
+        </div>
+
+        <div class="section-header">
+          <h3>Instituições Verificadas</h3>
+          <span id="totalCount" class="pill-muted">0</span>
+        </div>
+        <div id="ongsList" class="cards-list">
+          <div class="empty-state">Carregando organizações...</div>
+        </div>
+      </section>
+
+      <!-- View 2: Detalhe / Validar Selo -->
+      <section id="view-verify" class="view">
+        <div class="quick-verify">
+          <label for="directOngId">Validar por identificador direto:</label>
+          <div class="search-box">
+            <input id="directOngId" type="text" value="ong-123" placeholder="Ex.: ong-123" />
+            <button id="btnDirectVerify" type="button">Validar</button>
+          </div>
+        </div>
+
+        <div id="sealDetailCard" class="seal-detail-card">
+          <div class="empty-state">Selecione uma ONG ou digite um ID acima para verificar o certificado.</div>
+        </div>
+      </section>
+
+      <!-- View 3: Sobre LGPD -->
+      <section id="view-about" class="view">
+        <div class="info-card">
+          <h3>O que significa o Selo ONGSec?</h3>
+          <p>O Selo Digital de Conformidade atesta que a instituição concluiu um diagnóstico baseado nos guias da <strong>ANPD</strong>, <strong>CERT.br</strong> e <strong>CIS Controls IG1</strong>, atingiu score mínimo de 80% e zerou todas as pendências do seu plano de remediação.</p>
+        </div>
+        <div class="info-card">
+          <h3>Consulta Rápida & Anônima</h3>
+          <p>Esta interface consome o <strong>BFF Público</strong> sem necessidade de login ou envio de dados pessoais do doador, lendo diretamente a projeção otimizada de leitura (<strong>CQRS</strong>) mantida pelo <code>badge-service</code>.</p>
+        </div>
+        <div class="info-card">
+          <h3>Área da Instituição</h3>
+          <p>Sua ONG quer obter ou gerenciar o selo LGPD? <a href="/gestao/">Acesse o Painel de Gestão (/gestao/)</a>.</p>
+        </div>
+      </section>
+    </main>
+
+    <nav class="bottom-nav">
+      <button class="nav-btn active" data-view="view-explore">🔍<span>Explorar</span></button>
+      <button class="nav-btn" data-view="view-verify">🛡️<span>Validar Selo</span></button>
+      <button class="nav-btn" data-view="view-about">ℹ️<span>Sobre LGPD</span></button>
+    </nav>
+  </div>
+
+  <div id="toast" class="toast"></div>
+  <script src="app.js"></script>
+</body>
+</html>
+

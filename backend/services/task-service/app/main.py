@@ -3,10 +3,10 @@ import time
 import uuid
 from datetime import datetime
 
-from fastapi import FastAPI, Header, Request
+from fastapi import Body, FastAPI, Header, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from sqlalchemy import DateTime, ForeignKey, String, create_engine, func, select
+from sqlalchemy import DateTime, ForeignKey, String, Text, create_engine, func, select, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
 # ---------- Configuração (vem de variáveis de ambiente) ----------
@@ -49,6 +49,11 @@ class Tarefa(Base):
     titulo: Mapped[str] = mapped_column(String(200))
     prazo: Mapped[str] = mapped_column(String(30))
     status: Mapped[str] = mapped_column(String(20), default="PENDENTE")  # PENDENTE | CONCLUIDA | REABERTA
+    evidencia: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class ConclusaoTarefaIn(BaseModel):
+    evidencia: str | None = None
 
 
 # ---------- Formato dos dados que chegam (contrato OpenAPI) ----------
@@ -83,6 +88,9 @@ def iniciar():
     for tentativa in range(30):
         try:
             Base.metadata.create_all(engine)
+            with engine.begin() as conn:
+                if "postgresql" in DATABASE_URL:
+                    conn.execute(text("ALTER TABLE tarefas ADD COLUMN IF NOT EXISTS evidencia TEXT"))
             break
         except Exception:
             time.sleep(2)
@@ -128,6 +136,7 @@ def tarefa_json(t: Tarefa) -> dict:
     # HATEOAS: a resposta já traz os links das próximas ações possíveis
     return {"tarefa_id": t.tarefa_id, "plano_id": t.plano_id, "ong_id": t.ong_id,
             "titulo": t.titulo, "status": t.status, "prazo": t.prazo,
+            "evidencia": t.evidencia,
             "_links": {
                 "self": {"href": f"/v1/tarefas/{t.tarefa_id}", "method": "GET"},
                 "plano": {"href": f"/v1/planos/{t.plano_id}", "method": "GET"},
@@ -239,13 +248,26 @@ def obter_tarefa(tarefa_id: str, request: Request):
 
 
 @app.post("/v1/tarefas/{tarefa_id}/conclusao")
-def concluir_tarefa(tarefa_id: str, request: Request):
+def concluir_tarefa(tarefa_id: str, request: Request, corpo: ConclusaoTarefaIn | None = Body(default=None)):
     with Session(engine) as s:
         t = s.get(Tarefa, tarefa_id)
         if not t:
             return erro(404, "Tarefa não encontrada", tarefa_id, request)
-        if t.status == "CONCLUIDA":
+        if t.status == "CONCLUIDA" and not (corpo and corpo.evidencia):
             return erro(409, "Conflito de estado", "A tarefa já está concluída", request)
         t.status = "CONCLUIDA"
+        if corpo and corpo.evidencia:
+            t.evidencia = corpo.evidencia
+        s.commit()
+        return tarefa_json(t)
+
+
+@app.post("/v1/tarefas/{tarefa_id}/reabrir")
+def reabrir_tarefa_individual(tarefa_id: str, request: Request):
+    with Session(engine) as s:
+        t = s.get(Tarefa, tarefa_id)
+        if not t:
+            return erro(404, "Tarefa não encontrada", tarefa_id, request)
+        t.status = "REABERTA"
         s.commit()
         return tarefa_json(t)

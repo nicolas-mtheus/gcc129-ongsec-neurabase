@@ -1,0 +1,10 @@
+{
+  "name": "ONGSec Verificador Público",
+  "short_name": "ONGSec",
+  "start_url": "/publico/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0ea5e9",
+  "description": "Consulte gratuitamente a conformidade LGPD e o Selo Digital de ONGs."
+}
+

@@ -30,7 +30,7 @@
 
 ## 🚀 Execução Rápida do Sistema Completo (Parte 3)
 
-Com a entrega da **Parte 4 (Sistema em Funcionamento & Integração de LLM)**, a plataforma inteira sobe localmente com um **único comando**, orquestrando **14 containers** (Gateway, 2 BFFs, Frontend Web, Orquestrador SAGA dedicado, Serviço de IA com RAG + LangChain + Ollama, 4 microsserviços de domínio e 4 bancos PostgreSQL independentes):
+Com a entrega da **Parte 4 (Sistema em Funcionamento & Integração de LLM)**, a plataforma inteira sobe localmente com um **único comando**, orquestrando **16 containers** (Gateway, 2 BFFs, 2 frontends, Redis, Orquestrador SAGA dedicado, Serviço de IA com RAG + LangChain + Ollama, 4 microsserviços de domínio e 4 bancos PostgreSQL independentes):
 
 ```bash
 # Na raiz do repositório:
@@ -177,7 +177,7 @@ Documentação completa das convenções em [`docs/api/versionamento.md`](docs/a
 ├── gateway/
 │   └── nginx/              # API Gateway Nginx (Borda porta 8080)
 ├── infra/
-│   ├── compose/            # docker-compose.yml (12 containers, 6 redes, 4 volumes)
+│   ├── compose/            # docker-compose.yml (16 containers, 6 redes, 4 volumes)
 │   └── kubernetes/         # Manifests K8s (Deployments, Services, Ingress, HPA, Secrets)
 └── docs/                   # Documentação arquitetural completa
 ```

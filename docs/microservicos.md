@@ -108,6 +108,6 @@ flowchart TB
 Há dois tipos de seta interna:
 
 - **BFF → serviço:** composição da resposta do painel ou da consulta pública. Contratos em `docs/openapi/`.
-- **badge-service → audit-service e task-service:** chamadas do orquestrador da SAGA. Não passam pelo gateway.
+- **saga-orchestrator → audit-service, task-service e badge-service:** chamadas internas da SAGA. Não passam pelo gateway.
 
 Nenhum serviço lê o banco do outro. Eventos (`DIAGNOSTICO_CONCLUIDO`, `TAREFAS_REMEDIADAS`, `SELO_GERADO`, `SELO_REVOGADO`) saem pela *outbox* do serviço que os produz; o padrão está em [`docs/data-consistency.md`](data-consistency.md).

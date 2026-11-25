@@ -1,36 +1,52 @@
-# Kubernetes local — Parte 3
+# Kubernetes local — Partes 3 e 4
 
-Os manifests usam Minikube local e imagens ainda fornecidas pelos integrantes.
-As tags `ongsec/*:dev` sao nomes de integracao previstos; o cluster so iniciara
-as aplicacoes quando os respectivos Dockerfiles e codigos estiverem prontos.
+Os manifests usam Minikube local. As imagens `ongsec/*:dev` são construídas
+localmente a partir dos Dockerfiles do repositório (veja a seção de build) e não
+precisam ser publicadas em nenhum registry.
 
-## Pre-requisitos locais
+## Pré-requisitos locais
 
-- Docker Desktop em execucao;
+- Docker Desktop em execução;
 - `kubectl` e Minikube instalados;
-- Minikube com recursos suficientes para os quatro bancos e oito componentes
-  HTTP (recomendado: 4 CPUs e 6 GiB de memoria);
-- imagem propria para cada aplicacao: quatro servicos de dominio, dois BFFs,
-  API Gateway e Painel Web.
+- Minikube com recursos suficientes para os quatro bancos, o Redis e onze
+  componentes HTTP (recomendado: 4 CPUs e 6 GiB de memória);
+- Ollama em execução no computador, com o modelo `deephat:latest` baixado
+  (`ollama pull deephat:latest`). O `ai-service` acessa o Ollama pelo endereço
+  `http://host.minikube.internal:11434`. Se o serviço de IA não conseguir
+  conectar, inicie o Ollama com a variável `OLLAMA_HOST=0.0.0.0` e teste de novo.
 
-O App Mobile Publico e executado pelo Expo fora do cluster. Configure a base URL
-para o Gateway: `http://10.0.2.2:8080` no emulador Android, ou
-`http://<IP-DO-MINIKUBE>`/porta encaminhada em um aparelho fisico.
+## Componentes do cluster
 
-Todos os containers HTTP escutam na porta 8000, exceto Gateway e Painel Web, que
-escutam na porta 80. No cluster, os Services das aplicacoes expõem a porta 80;
-use nomes DNS como `http://org-service:80` e `http://bff-publico:80` nas chamadas
-internas. As APIs recebem `GET /healthz`; o Painel Web usa `GET /` como probe.
+| Tipo | Componentes |
+|---|---|
+| Bancos (StatefulSet, 1 volume cada) | `org-db`, `audit-db`, `task-db`, `badge-db` |
+| Microsserviços de domínio | `org-service`, `audit-service`, `task-service`, `badge-service` |
+| Orquestração e IA | `saga-orchestrator`, `ai-service` |
+| BFFs | `bff-gestao`, `bff-publico` |
+| Clientes | `web-gestao` (painel), `mobile-publico` (app mobile PWA) |
+| Infraestrutura | `api-gateway` (Nginx), `redis`, Ingress |
 
-Os microsservicos devem ler `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER` e
-`DB_PASSWORD`. O badge-service tambem recebe `AUDIT_SERVICE_URL` e
-`TASK_SERVICE_URL`; os BFFs recebem as URLs dos microsservicos que consomem.
-`org-service`, `bff-gestao` e Gateway recebem `JWT_SECRET`. Endpoints internos e
-nomes de variaveis estao definidos em `config/app-config.yaml` e nos Deployments.
+Todos os containers HTTP escutam na porta 8000, exceto Gateway, Painel Web e App
+Mobile, que são Nginx e escutam na porta 80. No cluster, os Services das aplicações
+expõem a porta 80; use nomes DNS como `http://org-service:80` e
+`http://bff-publico:80` nas chamadas internas. As APIs respondem a
+`GET /healthz`; o Painel Web e o App Mobile usam `GET /` como probe.
+
+## Configuração (ConfigMap e Secrets)
+
+Os quatro microsserviços de domínio leem `DB_HOST`, `DB_PORT`, `DB_NAME`,
+`DB_USER` e `DB_PASSWORD`. O `saga-orchestrator` recebe as URLs de org, audit,
+task e badge e chama esses serviços durante a SAGA. O `ai-service` recebe as URLs
+dos quatro serviços (usadas pelas tools do LangChain) e o endereço do Ollama. Os
+BFFs recebem as URLs dos serviços que consomem. As URLs e demais valores públicos
+ficam no ConfigMap `ongsec-app-config` (`config/app-config.yaml`).
+
+Informações sensíveis ficam em Secrets: uma senha para cada banco e o segredo do
+JWT (`JWT_SECRET`), compartilhado pelos serviços que emitem ou validam tokens.
 
 ## Subir o cluster
 
-Na raiz do repositorio:
+Na raiz do repositório:
 
 ```powershell
 minikube start --driver=docker --cpus=4 --memory=6144
@@ -44,31 +60,33 @@ powershell -ExecutionPolicy Bypass -File .\infra\kubernetes\config\create-local-
 ./infra/kubernetes/config/create-local-secrets.sh
 ```
 
-O script cria passwords aleatorias para cada banco e um segredo de JWT dentro do
-cluster. Os valores nao sao gravados em arquivos do repositorio nem impressos.
-O script preserva Secrets que ja existem, para que uma segunda execucao nao
-troque a senha da aplicacao sem trocar a senha armazenada no banco. Para reiniciar
+O script cria senhas aleatórias para cada banco e um segredo de JWT dentro do
+cluster. Os valores não são gravados em arquivos do repositório nem impressos.
+O script preserva Secrets que já existem, para que uma segunda execução não
+troque a senha da aplicação sem trocar a senha armazenada no banco. Para reiniciar
 as credenciais locais do zero, apague primeiro os quatro PVCs e os cinco Secrets;
-Postgres so aplica `POSTGRES_PASSWORD` quando inicializa um volume vazio.
+o PostgreSQL só aplica `POSTGRES_PASSWORD` quando inicializa um volume vazio.
 
 ## Construir e carregar as imagens locais
 
-Execute depois que os Dockerfiles correspondentes existirem. O `Dockerfile` de
-cada aplicacao deve estar na pasta abaixo e usar a porta acordada no contrato.
+São 11 imagens. O `Dockerfile` de cada aplicação está na pasta indicada abaixo.
 
 ```powershell
 minikube image build -t ongsec/org-service:dev backend/services/org-service
 minikube image build -t ongsec/audit-service:dev backend/services/audit-service
 minikube image build -t ongsec/task-service:dev backend/services/task-service
 minikube image build -t ongsec/badge-service:dev backend/services/badge-service
+minikube image build -t ongsec/saga-orchestrator:dev backend/services/saga-orchestrator
+minikube image build -t ongsec/ai-service:dev backend/services/ai-service
 minikube image build -t ongsec/bff-gestao:dev backend/bffs/gestao
 minikube image build -t ongsec/bff-publico:dev backend/bffs/publico
 minikube image build -t ongsec/api-gateway:dev gateway/nginx
 minikube image build -t ongsec/web-gestao:dev frontend/web-gestao
+minikube image build -t ongsec/mobile-publico:dev frontend/mobile-publico
 ```
 
-As imagens sao locais ao Minikube; nao e necessario publicar em registry. O app
-mobile nao tem Deployment: ele roda no Expo em um computador ou telefone.
+As imagens ficam locais ao Minikube. Se alguma delas faltar, o pod correspondente
+fica em `ErrImagePull` ou `ImagePullBackOff`.
 
 ## Implantar e verificar
 
@@ -81,10 +99,17 @@ kubectl -n ongsec rollout status statefulset/badge-db
 kubectl -n ongsec get deployments,pods,services,pvc,ingress,hpa
 ```
 
-O `Ingress` recebe `http://ongsec.local/` e envia tudo ao API Gateway. O Gateway
-deve rotear `/api/gestao/*` para `bff-gestao`, `/api/publico/*` para `bff-publico`
-e `/gestao/*` para `web-gestao`. O Gateway precisa expor `GET /healthz`; todos
-os outros servicos HTTP precisam expor `GET /healthz` na porta 8000.
+Todos os pods devem chegar a `Running` e `1/1`. Para conferir os componentes da
+Parte 4 (no Linux/macOS, troque `findstr` por `grep`):
+
+```powershell
+kubectl -n ongsec get pods | findstr "saga ai-service mobile redis"
+```
+
+O Ingress recebe `http://ongsec.local/` e envia tudo ao API Gateway. O Gateway
+roteia `/api/gestao/*` para `bff-gestao`, `/api/publico/*` para `bff-publico`,
+`/gestao/*` para `web-gestao` (painel) e `/publico/*` para `mobile-publico`
+(app mobile). O Gateway responde a `GET /healthz`.
 
 Para testar sem editar o arquivo `hosts`:
 
@@ -93,44 +118,47 @@ $minikubeIp = minikube ip
 curl.exe -H "Host: ongsec.local" "http://$minikubeIp/healthz"
 ```
 
-Para conectar o app Expo ao Gateway no cluster local, mantenha este comando em
-execucao:
+Para abrir o sistema no navegador sem usar o Ingress, mantenha este comando em
+execução:
 
 ```powershell
 kubectl -n ongsec port-forward service/api-gateway 8080:80
 ```
 
-Use `http://10.0.2.2:8080` no emulador Android e
-`http://<IP-DO-COMPUTADOR>:8080` no telefone fisico. O forwarding precisa
-continuar ativo enquanto o app estiver em uso. O navegador no computador pode
-abrir o Painel Web em `http://localhost:8080/gestao/` durante o mesmo forwarding.
+- Painel de gestão: `http://localhost:8080/gestao/`
+- App mobile público: `http://localhost:8080/publico/`
 
-Se o ingress ainda nao estiver pronto, verifique `kubectl -n ingress-nginx get
-pods,services` e os eventos com `kubectl -n ongsec get events --sort-by=.lastTimestamp`.
+O encaminhamento precisa continuar ativo enquanto o sistema estiver em uso.
+
+Se o Ingress não ficar pronto, verifique `kubectl -n ingress-nginx get pods,services`
+e os eventos com `kubectl -n ongsec get events --sort-by=.lastTimestamp`.
 
 ## Demonstrar escalabilidade
 
-O HPA do BFF Publico usa CPU media alvo de 70%, com 1 a 3 replicas. O cluster
-precisa do metrics-server; confira `kubectl top pods -n ongsec`. Para demonstrar
-o aumento para tres replicas sem depender de carga de CPU, ajuste
-temporariamente o minimo do HPA:
+O HPA do `bff-publico` usa CPU média alvo de 70%, com 1 a 3 réplicas. O cluster
+precisa do metrics-server; confira com `kubectl top pods -n ongsec`.
 
-No PowerShell 5.1 as aspas duplas do JSON somem ao chamar o `kubectl` e o retorno e `invalid JSON patch`. Escape as aspas:
+Sem carga suficiente de CPU, o HPA pode permanecer em uma réplica. Por isso a
+demonstração eleva temporariamente o mínimo do HPA para 3:
+
+No PowerShell 5.1, as aspas duplas do JSON precisam ser escapadas:
 
 ```powershell
 kubectl -n ongsec patch hpa bff-publico --type merge -p '{\"spec\":{\"minReplicas\":3}}'
 kubectl -n ongsec get pods -l app.kubernetes.io/name=bff-publico -w
 ```
 
-Depois da demonstracao, restaure a escala minima definida no manifest:
+No Bash, use aspas simples normais: `-p '{"spec":{"minReplicas":3}}'`.
+
+Depois da demonstração, restaure o mínimo definido no manifest:
 
 ```powershell
 kubectl -n ongsec patch hpa bff-publico --type merge -p '{\"spec\":{\"minReplicas\":1}}'
 ```
 
-Para demonstrar o HPA reagindo a CPU, gerem carga de teste controlada e observem
-`kubectl -n ongsec get hpa bff-publico -w`; sem carga, ele pode permanecer em uma
-replica. Nao prometam autoscaling observado se nao houver carga suficiente.
+Para observar o HPA reagindo à CPU, gere carga de teste controlada e acompanhe
+`kubectl -n ongsec get hpa bff-publico -w`.
+
 
 ## Limpar o cluster
 
@@ -139,4 +167,4 @@ kubectl delete namespace ongsec
 minikube stop
 ```
 
-A exclusao do namespace apaga os PVCs e os dados de demonstracao locais.
+A exclusão do namespace apaga os PVCs e os dados de demonstração locais.

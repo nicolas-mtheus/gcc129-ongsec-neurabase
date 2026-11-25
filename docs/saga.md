@@ -21,7 +21,7 @@ Antes da SAGA, o caminho de uso já produziu dois fatos locais:
 1. Dona Maria concluiu o diagnóstico: `POST /v1/diagnosticos/diag-55/conclusao` → `score = 92`, evento `DIAGNOSTICO_CONCLUIDO`.
 2. O plano foi executado até `tarefas_pendentes = 0`. Quando a última tarefa conclui, o task-service registra `TAREFAS_REMEDIADAS`.
 
-A SAGA **começa** quando o BFF Gestão chama `POST /v1/solicitacoes` com `ong_id`, `diagnostico_id` e `plano_id`. O badge-service grava a solicitação em `SOLICITADA` e devolve `202`. Daí o orquestrador confirma os dois fatos nos outros serviços e, só então, emite o selo.
+A SAGA **começa** quando o BFF Gestão chama `POST /v1/solicitacoes` no `saga-orchestrator`, com `ong_id`, `diagnostico_id` e `plano_id`. O orquestrador registra a solicitação em `SOLICITADA` (no banco dele) e devolve `202`. Daí ele confirma os dois fatos no audit-service e no task-service e, só então, manda o badge-service emitir o selo.
 
 Se o plano ainda tiver tarefa pendente ou o diagnóstico não tiver score, o `POST` responde `422` e a SAGA **nem abre**. Isso não é compensação: nenhum passo à frente foi aplicado.
 
@@ -58,22 +58,24 @@ O evento de revogação, que o projetor CQRS consome, chama-se **`SELO_REVOGADO`
 ```mermaid
 sequenceDiagram
     participant G as BFF Gestao
-    participant B as badge-service
+    participant S as saga-orchestrator
     participant A as audit-service
     participant T as task-service
+    participant B as badge-service
     participant O as outbox
 
-    G->>B: POST /v1/solicitacoes
-    B-->>G: 202 SOLICITADA sol-998
-    B->>A: GET /v1/diagnosticos/diag-55
-    A-->>B: CONCLUIDO score 92
-    Note over B: historico DIAGNOSTICO_CONCLUIDO
-    B->>T: GET /v1/organizacoes/ong-123/plano-atual
-    T-->>B: tarefas_pendentes 0
-    Note over B: historico TAREFAS_REMEDIADAS
-    B->>B: grava selo ATIVO
-    B->>O: SELO_GERADO
-    Note over B: estado SELO_EMITIDO
+    G->>S: POST /v1/solicitacoes
+    S-->>G: 202 SOLICITADA
+    S->>A: GET diagnostico
+    A-->>S: CONCLUIDO score 92
+    Note over S: historico DIAGNOSTICO_CONCLUIDO
+    S->>T: GET plano-atual
+    T-->>S: tarefas_pendentes 0
+    Note over S: historico TAREFAS_REMEDIADAS
+    S->>B: POST /v1/selos
+    B->>O: grava selo ATIVO + evento SELO_GERADO
+    B-->>S: 201 selo emitido
+    Note over S: estado SELO_EMITIDO
 ```
 
 Depois disso, `GET /api/publico/selos/ong-123` devolve o JSON enxuto do BFF Público. `GET /api/gestao/selos/ong-123/detalhes` agrega score, responsável legal, `tarefas_pendentes = 0` e o mesmo `historico_saga_emissao`. O mapa campo a campo está em [`docs/api/alinhamento-bff.md`](api/alinhamento-bff.md).
@@ -84,19 +86,21 @@ Cenário apresentado: o orquestrador já confirmou diagnóstico e plano. Na hora
 
 ```mermaid
 sequenceDiagram
-    participant B as badge-service
+    participant S as saga-orchestrator
     participant A as audit-service
     participant T as task-service
+    participant B as badge-service
 
-    B->>A: GET /v1/diagnosticos/diag-55
-    A-->>B: CONCLUIDO
-    B->>T: GET plano-atual
-    T-->>B: tarefas_pendentes 0
-    B->>B: falha ao gravar o selo
-    B->>B: POST compensacoes sol-998
-    Note over B: estado COMPENSADA
-    B->>T: POST /v1/planos/plano-1/reabertura
-    T-->>B: tarefas_pendentes 1
+    S->>A: GET diagnostico
+    A-->>S: CONCLUIDO
+    S->>T: GET plano-atual
+    T-->>S: tarefas_pendentes 0
+    S->>B: POST /v1/selos
+    B-->>S: erro ao gravar o selo
+    Note over S: historico FALHA_EMISSAO_SELO
+    S->>T: POST reabertura do plano (compensacao)
+    T-->>S: tarefas_pendentes 1
+    Note over S: estado COMPENSADA
 ```
 
 Não se chama revogação neste cenário: o selo nunca foi emitido. Não se altera o diagnóstico: o score `92` permanece.

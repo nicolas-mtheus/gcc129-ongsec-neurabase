@@ -12,151 +12,103 @@ servers:
   - url: http://badge-service:8080
     description: Rede interna. Não é publicado no API Gateway.
 tags:
-  - name: solicitacoes
   - name: consulta
   - name: selos
 paths:
-  /v1/solicitacoes:
-    post:
-      tags: [solicitacoes]
-      operationId: abrirSolicitacao
-      summary: Aceita a solicitação de emissão do selo
-      description: >
-        Responde 202 porque o selo só fica ATIVO quando a SAGA registra
-        SELO_GERADO. 422 se ainda houver tarefa pendente no plano informado.
-        A mesma Idempotency-Key não abre duas solicitações.
-      parameters:
-        - $ref: '#/components/parameters/CorrelationId'
-        - $ref: '#/components/parameters/IdempotencyKey'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/NovaSolicitacao'
-            example:
-              ong_id: ong-123
-              diagnostico_id: diag-55
-              plano_id: plano-1
-      responses:
-        '202':
-          description: Solicitação aceita. O estado final ainda não é o selo ativo.
-          headers:
-            Location:
-              schema:
-                type: string
-              example: /v1/solicitacoes/sol-998
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Solicitacao'
-        '400':
-          $ref: '#/components/responses/RequisicaoInvalida'
-        '401':
-          $ref: '#/components/responses/NaoAutenticado'
-        '409':
-          description: Já existe solicitação em andamento para a organização.
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/Erro'
-        '422':
-          description: Plano com tarefas pendentes ou diagnóstico sem score.
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/Erro'
-  /v1/solicitacoes/{solicitacaoId}:
+  /v1/selos:
     parameters:
-      - $ref: '#/components/parameters/SolicitacaoId'
       - $ref: '#/components/parameters/CorrelationId'
-    get:
-      tags: [solicitacoes]
-      operationId: obterSolicitacao
-      summary: Obtém a solicitação, o histórico da SAGA e os links
-      description: >
-        Recurso com HATEOAS. `historico_saga_emissao` usa os mesmos nomes de
-        evento do BFF Gestão. Os `href` são do badge-service; o BFF troca
-        o link `revogar` pelo caminho público documentado no gateway.
-      responses:
-        '200':
-          description: Solicitação e links de navegação.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Solicitacao'
-              example:
-                solicitacao_id: sol-998
-                ong_id: ong-123
-                diagnostico_id: diag-55
-                plano_id: plano-1
-                estado: SELO_EMITIDO
-                id_selo: CERT-2026-998
-                historico_saga_emissao:
-                  - evento: DIAGNOSTICO_CONCLUIDO
-                    servico: audit-service
-                    sucesso: true
-                  - evento: TAREFAS_REMEDIADAS
-                    servico: task-service
-                    sucesso: true
-                  - evento: SELO_GERADO
-                    servico: badge-service
-                    sucesso: true
-                _links:
-                  self:
-                    href: /v1/solicitacoes/sol-998
-                  consulta_publica:
-                    href: /v1/consulta/organizacoes/ong-123
-                  certificacao:
-                    href: /v1/organizacoes/ong-123/certificacao
-                  revogar:
-                    href: /v1/selos/CERT-2026-998/revogacao
-                    method: POST
-        '401':
-          $ref: '#/components/responses/NaoAutenticado'
-        '404':
-          $ref: '#/components/responses/NaoEncontrado'
-  /v1/solicitacoes/{solicitacaoId}/compensacoes:
-    parameters:
-      - $ref: '#/components/parameters/SolicitacaoId'
-      - $ref: '#/components/parameters/CorrelationId'
-      - $ref: '#/components/parameters/IdempotencyKey'
     post:
-      tags: [solicitacoes]
-      operationId: compensarSolicitacao
-      summary: Compensa a solicitação
+      tags: [selos]
+      operationId: emitirSelo
+      summary: Emite um selo digital
       description: >
-        Usada pela SAGA quando um passo posterior falha. Marca a solicitação
-        como COMPENSADA. Se o selo já tinha sido emitido, o status público
-        passa a REVOGADO. O diagrama de quando chamar esta operação fica no
-        documento de SAGA.
+        Chamado pelo `saga-orchestrator` depois de confirmar o diagnóstico
+        e o plano de tarefas. Grava o selo e o evento `SELO_GERADO` na outbox.
+        O cabeçalho `X-Simular-Falha: true` provoca erro 500 para demonstrar
+        a compensação da SAGA.
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [motivo]
+              required: [ong_id, solicitacao_id, nome_instituicao]
               properties:
-                motivo:
+                ong_id:
                   type: string
+                solicitacao_id:
+                  type: string
+                nome_instituicao:
+                  type: string
+                cnpj:
+                  type: string
+            example:
+              ong_id: ong-123
+              solicitacao_id: sol-998
+              nome_instituicao: Associação Cuidar
       responses:
-        '200':
-          description: Compensação aplicada.
+        '201':
+          description: Selo emitido com status ATIVO.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Solicitacao'
-        '401':
-          $ref: '#/components/responses/NaoAutenticado'
-        '404':
-          $ref: '#/components/responses/NaoEncontrado'
-        '409':
-          description: Solicitação já compensada com outra chave de idempotência.
+                $ref: '#/components/schemas/Selo'
+        '500':
+          description: Falha na gravação do selo (a SAGA executa a compensação).
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Erro'
+  /v1/organizacoes/{ongId}/revogacao:
+    parameters:
+      - $ref: '#/components/parameters/OngId'
+      - $ref: '#/components/parameters/CorrelationId'
+    post:
+      tags: [selos]
+      operationId: revogarSeloPorOrganizacao
+      summary: Revoga o selo mais recente da organização
+      responses:
+        '200':
+          description: Selo revogado. A consulta pública passa a REVOGADO.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Selo'
+        '404':
+          $ref: '#/components/responses/NaoEncontrado'
+        '409':
+          description: Selo já revogado.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+    /v1/consulta/organizacoes:
+    get:
+      tags: [consulta]
+      operationId: listarConsultaPublica
+      summary: Lista os selos no modelo de leitura (CQRS)
+      description: Consulta pública, sem login. Aceita busca por nome, ID da ONG, ID do selo ou CNPJ.
+      parameters:
+        - name: q
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Lista de selos públicos.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  itens:
+                    type: array
+                    items:
+                      type: object
+                  total:
+                    type: integer
   /v1/consulta/organizacoes/{ongId}:
     parameters:
       - $ref: '#/components/parameters/OngId'

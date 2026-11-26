@@ -83,11 +83,13 @@ flowchart TB
     BFFP[BFF Publico]
     BFFG[BFF Gestao]
 
-    subgraph dominio [Servicos de dominio]
+    subgraph dominio [Servicos de dominio, Orquestrador e IA]
         ORG[org-service]
         AUD[audit-service]
         TSK[task-service]
         BDG[badge-service]
+        SAGA[saga-orchestrator]
+        AI[ai-service]
     end
 
     App -->|/api/publico| GW
@@ -100,9 +102,17 @@ flowchart TB
     BFFG --> AUD
     BFFG --> TSK
     BFFG --> BDG
+    BFFG -->|inicia SAGA| SAGA
+    BFFG -->|IA / RAG| AI
 
-    BDG -->|confirma diagnostico| AUD
-    BDG -->|confirma plano e reabre| TSK
+    SAGA -->|valida diagnostico| AUD
+    SAGA -->|valida e reabre plano| TSK
+    SAGA -->|emite selo| BDG
+
+    AI -.->|LangChain Tools| ORG
+    AI -.->|LangChain Tools| AUD
+    AI -.->|LangChain Tools| TSK
+    AI -.->|LangChain Tools| BDG
 ```
 
 Há dois tipos de seta interna:

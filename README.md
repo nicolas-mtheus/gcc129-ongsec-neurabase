@@ -4,7 +4,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Status-Parte%203%20Conclu%C3%ADda-success?style=for-the-badge" alt="Status">
+  <img src="https://img.shields.io/badge/Status-Parte%204%20Conclu%C3%ADda-success?style=for-the-badge" alt="Status">
   <img src="https://img.shields.io/badge/UFLA-GCC129%20Sistemas%20Distribu%C3%ADdos-red?style=for-the-badge" alt="UFLA">
   <img src="https://img.shields.io/badge/LGPD-Conformidade-success?style=for-the-badge" alt="LGPD">
   <img src="https://img.shields.io/badge/Docker-Compose%20v2-blue?style=for-the-badge&logo=docker" alt="Docker">
@@ -28,27 +28,36 @@
 
 ---
 
-## 🚀 Execução Rápida do Sistema Completo (Parte 3)
+## 🚀 Execução Rápida do Sistema Completo
 
 Com a entrega da **Parte 4 (Sistema em Funcionamento & Integração de LLM)**, a plataforma inteira sobe localmente com um **único comando**, orquestrando **16 containers** (Gateway, 2 BFFs, 2 frontends, Redis, Orquestrador SAGA dedicado, Serviço de IA com RAG + LangChain + Ollama, 4 microsserviços de domínio e 4 bancos PostgreSQL independentes):
 
 ```bash
-# Na raiz do repositório:
+# Na raiz do repositório (a única porta publicada por padrão é a 8080; para usar outra porta, defina GATEWAY_PORT=8085):
 docker compose -f infra/compose/docker-compose.yml up --build -d
 ```
 
-### 🌐 Endereços de Acesso (Única Porta Exposta: 8080)
+### 🤖 Pré-requisito de IA Local (Ollama)
+- O `ai-service` conecta ao **Ollama** rodando no host via `http://host.docker.internal:11434` usando por padrão o modelo **`deephat:latest`** (configurável por `OLLAMA_BASE_URL` e `OLLAMA_MODEL`).
+- Para respostas ao vivo do modelo local:
+  ```bash
+  ollama pull deephat:latest
+  OLLAMA_HOST=0.0.0.0:11434 ollama serve
+  ```
+- Caso o Ollama não esteja ativo no ambiente de teste, a plataforma continua funcionando normalmente e o `ai-service` aciona o **Fallback Resiliente** contextualizado (RAG + LangChain Tools) sem travar os fluxos.
+
+### 🌐 Endereços de Acesso (Única Porta Exposta: `8080` ou `${GATEWAY_PORT}`)
 
 | Recurso | URL | Descrição |
 |---|---|---|
-| **Painel Web de Gestão** | [`http://localhost:8080/gestao/`](http://localhost:8080/gestao/) | Interface SPA com métricas, visualizador SAGA, HATEOAS e simulador |
+| **Painel Web de Gestão** | [`http://localhost:8080/gestao/`](http://localhost:8080/gestao/) | Interface SPA com controle de perfil RBAC (`GESTOR` limpo / `ADMIN` técnico) |
+| **Portal Mobile Público (PWA)** | [`http://localhost:8080/publico/`](http://localhost:8080/publico/) | Consulta pública anônima (CQRS) de ONGs certificadas e selo verificável |
 | **Healthcheck de Borda** | [`http://localhost:8080/healthz`](http://localhost:8080/healthz) | Verificação de integridade do Nginx Gateway (HTTP 200) |
-| **Consulta Pública de Selo** | [`http://localhost:8080/api/publico/selos/ong-123`](http://localhost:8080/api/publico/selos/ong-123) | Rota anônima via BFF Público (CQRS de leitura) |
+| **Consulta Pública de Selo (API)** | [`http://localhost:8080/api/publico/selos/ong-123`](http://localhost:8080/api/publico/selos/ong-123) | Rota anônima via BFF Público (CQRS de leitura) |
 
 #### 🔑 Credenciais para Demonstração no Painel Web
-- **E-mail:** `maria@associacaocuidar.org`
-- **Senha:** `senha-segura-123`
-*(No painel há o botão "⚡ Usar Gestor Demo" para preenchimento com 1 clique).*
+- **Perfil `GESTOR` (Associação Cuidar — `ong-123`):** `maria@associacaocuidar.org` / `senha-segura-123` *(ou crie uma nova ONG em "Cadastrar Nova ONG" / clique em "⚡ Preencher Gestor Demo")*
+- **Perfil `ADMIN` (Monitoramento Técnico, SAGA, Bancos & Debug IA):** `admin@gmail.com` / `admin123` *(configurável via variável `ADMIN_DEFAULT_PASSWORD`)*
 
 ---
 
@@ -80,35 +89,35 @@ O **ONGSec** atua como um consultor de segurança automatizado e emissor de selo
 
 ---
 
-## Arquitetura Distribuída & Entregas da Parte 3
+## Arquitetura Distribuída & Containerização
 
 O sistema utiliza o padrão de **Microsserviços com Database per Service** (cada serviço possui sua própria instância isolada de banco de dados). O tráfego externo entra sempre pelo API Gateway antes de alcançar o BFF correspondente.
 
 ![ONGSec - Arquitetura geral: dois clientes, API Gateway, dois BFFs, orquestrador SAGA dedicado, quatro servicos e bancos isolados](docs/img/arquitetura-geral.png)
 
 ### 🐳 1. Docker e Dockerfiles Customizados
-- **Dockerfile próprio para cada serviço:** Nenhum serviço utiliza imagens prontas de terceiros sem customização.
-- **Multi-Stage Build no Frontend (`frontend/web-gestao/Dockerfile`):**
-  - **Estágio 1 (Builder):** Ambiente Node.js Alpine para montagem dos artefatos estáticos.
-  - **Estágio 2 (Produção):** Nginx Alpine mínimo servindo apenas `/dist`.
+- **Dockerfile próprio para cada serviço:** Nenhum dos 11 serviços construídos utiliza imagens prontas de terceiros sem customização.
+- **Multi-Stage Build nos Frontends (`frontend/web-gestao/Dockerfile` e `frontend/mobile-publico/Dockerfile`):**
+  - **Estágio 1 (Builder):** Ambiente `node:20-alpine` para montagem dos artefatos estáticos.
+  - **Estágio 2 (Produção):** `nginx:alpine` mínimo servindo apenas `/dist`.
   - **Ganho Arquitetural:** Redução superior a 90% no tamanho da imagem final (~300MB para ~25MB), eliminação de ferramentas de build em runtime e mitigação de vulnerabilidades.
-- **Serviços Backend em Python:** Imagens baseadas em `python:3.11-slim`, dependências instaladas com `--no-cache-dir`, sem privilégios desnecessários.
+- **Serviços Backend em Python:** Imagens enxutas baseadas em `python:3.11-slim` (BFFs) e `python:3.12-slim` (microsserviços, orquestrador SAGA e IA), dependências instaladas com `--no-cache-dir` e cache de camadas otimizado.
 
 ### 🔌 2. API Gateway e BFFs (Backend-for-Frontend)
 - **API Gateway (Nginx):**
-  - Porta 8080 mapeada para a porta 80 do container. Única porta HTTP publicada pelo Compose.
-  - Roteamento reverso inteligente: `/gestao/` para o frontend, `/api/gestao/*` para o BFF Gestão e `/api/publico/*` para o BFF Público.
+  - Porta `8080` (ou `${GATEWAY_PORT}`) mapeada para a porta `80` do container. Única porta HTTP publicada pelo Compose.
+  - Roteamento reverso inteligente: `/gestao/` para o Painel Web, `/publico/` para o Portal Mobile PWA, `/api/gestao/*` para o BFF Gestão e `/api/publico/*` para o BFF Público.
   - Verificação de saúde de borda na rota `GET /healthz`.
   - Rate limiting e rastreabilidade distribuída via header `X-Correlation-ID`.
-- **BFF Gestão (`bff-gestao`):** Porta interna 8000. Exige JWT em rotas protegidas, valida credenciais com Argon2 no `org-db`, agrega múltiplos serviços e injeta controles hipermidiáticos HATEOAS.
-- **BFF Público (`bff-publico`):** Porta interna 8000. Consulta anônima de selos via CQRS otimizado para cidadãos e doadores.
+- **BFF Gestão (`bff-gestao`):** Porta interna `8000`. Exige JWT válido em rotas protegidas (com revogação de `jti` no Redis), impõe RBAC (`GESTOR` vs `ADMIN`), agrega múltiplos serviços e injeta controles hipermidiáticos HATEOAS.
+- **BFF Público (`bff-publico`):** Porta interna `8000`. Consulta anônima de selos e busca de ONGs certificadas via CQRS otimizado para cidadãos e doadores.
 
 ### 💾 3. Persistência e Isolamento de Redes (Compose)
-- **5 Volumes Nomeados:** `org-data`, `audit-data`, `task-data`, `badge-data` e `saga-data`, assegurando persistência durável dos bancos PostgreSQL 16.
+- **5 Volumes Nomeados:** `org_db_data`, `audit_db_data`, `task_db_data`, `badge_db_data` e `saga_db_data`, assegurando persistência durável dos 4 bancos PostgreSQL 16 e do histórico SQLite do `saga-orchestrator`.
 - **6 Redes Definidas com Isolamento Estrito:**
-  - `edge-network`: Conecta Gateway aos BFFs e Frontend Web.
-  - `app-network`: Conecta BFFs aos microsserviços de domínio.
-  - `org-data-network`, `audit-data-network`, `task-data-network`, `badge-data-network`: Redes privadas exclusivas entre cada microsserviço e seu respectivo PostgreSQL, garantindo que nenhum serviço acerte diretamente o banco alheio.
+  - `edge`: Conecta o `gateway` aos BFFs (`bff-gestao`, `bff-publico`) e frontends (`web-gestao`, `mobile-publico`).
+  - `app`: Conecta BFFs, `redis`, `saga-orchestrator`, `ai-service` e os 4 microsserviços de domínio.
+  - `org-data`, `audit-data`, `task-data`, `badge-data` (`internal: true`): Redes privadas exclusivas entre cada microsserviço e seu respectivo PostgreSQL, garantindo no nível de rede que nenhum serviço acesse o banco alheio.
 
 ### ☸️ 4. Orquestração em Kubernetes (`infra/kubernetes/`)
 - **Deployments & Services:** Manifestos declarativos com réplicas, `livenessProbe` e `readinessProbe` baseados em `/healthz`. Services com ClusterIP e mapeamento dual-port (80 e 8000).
@@ -147,7 +156,9 @@ Todos os serviços internos e BFFs seguem contratos REST explícitos, versionado
 | **BFF Público** *(via Gateway)* | `GET /api/publico/selos/{ongId}` | Consulta anônima do selo (CQRS) | [`docs/api/alinhamento-bff.md`](docs/api/alinhamento-bff.md) |
 | **BFF Gestão** *(via Gateway, JWT)* | `POST /api/gestao/sessoes` | Login e emissão de JWT | [`docs/gateway-bffs.md`](docs/gateway-bffs.md) |
 | **BFF Gestão** *(via Gateway, JWT)* | `GET /api/gestao/selos/{ongId}/detalhes` | Visão agregada + `_links` HATEOAS | [`docs/api/alinhamento-bff.md`](docs/api/alinhamento-bff.md) |
-| **BFF Gestão** *(via Gateway, JWT)* | `POST /api/gestao/selos/{ongId}/revogar` | Revogação administrativa de selo | [`docs/api/alinhamento-bff.md`](docs/api/alinhamento-bff.md) |
+| **BFF Gestão** *(via Gateway, `ADMIN`)* | `POST /api/gestao/selos/{ongId}/revogar` | Revogação administrativa de selo | [`docs/api/alinhamento-bff.md`](docs/api/alinhamento-bff.md) |
+| **BFF Gestão — IA** *(via Gateway, JWT)* | `POST /api/gestao/ia/consultoria` · `/comparar-rag` · `/circuit-breaker` | Consultoria IA contextualizada, comparativo RAG e controle de resiliência | [`docs/api/alinhamento-bff.md`](docs/api/alinhamento-bff.md) |
+| **`ai-service`** *(interno)* | `POST /v1/ia/consultoria` · `/diagnostico/perguntas-dinamicas` · `/plano-acao/personalizar` | RAG, LangChain Tools, perguntas dinâmicas e plano sob medida | [`docs/openapi/ai-service.yaml`](docs/openapi/ai-service.yaml) |
 | **`saga-orchestrator`** *(interno)* | `POST /v1/solicitacoes` (`202`) · `POST /v1/solicitacoes/{id}/compensacoes` | Orquestração e compensação da SAGA | [`docs/openapi/saga-orchestrator.yaml`](docs/openapi/saga-orchestrator.yaml) |
 | **`org-service`** *(interno)* | `POST /v1/organizacoes` · `GET /v1/organizacoes/{ongId}` · `POST /v1/sessoes` | Cadastro de ONGs, usuários e JWT | [`docs/openapi/org-service.yaml`](docs/openapi/org-service.yaml) |
 | **`audit-service`** *(interno)* | `POST /v1/diagnosticos/{id}/conclusao` · `GET /v1/diagnosticos/{id}` | Questionário e cálculo de score | [`docs/openapi/audit-service.yaml`](docs/openapi/audit-service.yaml) |
@@ -173,7 +184,8 @@ Documentação completa das convenções em [`docs/api/versionamento.md`](docs/a
 │       ├── task-service/      # Remediação e Tarefas
 │       └── badge-service/     # Emissão, Revogação e CQRS de Selos
 ├── frontend/
-│   └── web-gestao/         # Painel Web SPA (Multi-stage build Docker)
+│   ├── web-gestao/         # Painel Web SPA (Multi-stage build Docker)
+│   └── mobile-publico/     # Portal Mobile Público PWA (Multi-stage build Docker)
 ├── gateway/
 │   └── nginx/              # API Gateway Nginx (Borda porta 8080)
 ├── infra/

@@ -23,6 +23,7 @@ from .resilience import (
     telemetria,
 )
 from .tools import coletar_contexto_ong
+from .escopo import MENSAGEM_FORA_DO_ESCOPO, fora_do_escopo
 
 app = FastAPI(title="ONGSec ai-service (RAG + LangChain + Ollama)", version="1.0.0")
 
@@ -91,6 +92,22 @@ def listar_perguntas_teste():
 
 @app.post("/v1/ia/consultoria")
 def consultoria_ia(body: ConsultoriaIn):
+    if fora_do_escopo(body.pergunta):
+        return {
+            "ong_id": body.ong_id,
+            "pergunta": body.pergunta,
+            "usar_rag": body.usar_rag,
+            "modelo": OLLAMA_MODEL,
+            "resposta": MENSAGEM_FORA_DO_ESCOPO,
+            "modo_operacao": "FORA_DO_ESCOPO",
+            "cache_hit": False,
+            "retries": 0,
+            "latencia_ms": 0.0,
+            "circuit_breaker": circuit_breaker.snapshot(),
+            "rag_fontes": [],
+            "dados_tools": {},
+        }
+
     # 1. Executa Tools LangChain para consultar dados reais dos microsserviços
     contexto_ong = coletar_contexto_ong(body.ong_id)
 
@@ -124,6 +141,23 @@ def consultoria_ia(body: ConsultoriaIn):
 
 @app.post("/v1/ia/comparar-rag")
 def comparar_com_e_sem_rag(body: ComparacaoRagIn):
+    if fora_do_escopo(body.pergunta):
+        recusa = {
+            "resposta": MENSAGEM_FORA_DO_ESCOPO,
+            "modo_operacao": "FORA_DO_ESCOPO",
+            "cache_hit": False,
+            "retries": 0,
+            "latencia_ms": 0.0,
+        }
+        return {
+            "ong_id": body.ong_id,
+            "pergunta": body.pergunta,
+            "modelo": OLLAMA_MODEL,
+            "chunks_recuperados": [],
+            "com_rag": recusa,
+            "sem_rag": recusa,
+        }
+
     contexto_ong = coletar_contexto_ong(body.ong_id)
     chunks_rag = rag_store.recuperar_contexto(body.pergunta, top_k=3)
 

@@ -177,7 +177,7 @@ Documentação completa das convenções em [`docs/api/versionamento.md`](docs/a
 ├── gateway/
 │   └── nginx/              # API Gateway Nginx (Borda porta 8080)
 ├── infra/
-│   ├── compose/            # docker-compose.yml (16 containers, 6 redes, 4 volumes)
+│   ├── compose/            # docker-compose.yml (16 containers, 6 redes, 5 volumes)
 │   └── kubernetes/         # Manifests K8s (Deployments, Services, Ingress, HPA, Secrets)
 └── docs/                   # Documentação arquitetural completa
 ```

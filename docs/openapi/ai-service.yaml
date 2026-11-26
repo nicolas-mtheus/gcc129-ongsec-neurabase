@@ -1,0 +1,209 @@
+openapi: 3.0.3
+info:
+  title: ONGSec - ai-service
+  version: 1.0.0
+  description: Serviço de Consultoria LGPD com RAG, LangChain, ferramentas internas e resiliência distribuída sobre Ollama.
+servers:
+  - url: http://ai-service:8000
+    description: Rede interna do cluster/Compose
+paths:
+  /healthz:
+    get:
+      summary: Healthcheck do serviço de IA, status do RAG e estado do Circuit Breaker
+      responses:
+        "200":
+          description: Serviço saudável com resumo do índice RAG e Circuit Breaker
+  /v1/ia/rag/status:
+    get:
+      summary: Status da base de conhecimento e índice vetorial RAG
+      responses:
+        "200":
+          description: Quantidade de documentos, chunks e parâmetros de indexação
+  /v1/ia/perguntas-teste:
+    get:
+      summary: Lista as perguntas de referência para avaliação comparativa do RAG
+      responses:
+        "200":
+          description: Lista de perguntas padrão de avaliação
+  /v1/ia/consultoria:
+    post:
+      summary: Executa consultoria LGPD contextualizada (com filtro de escopo, Tools, RAG e resiliência)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConsultoriaIn"
+      responses:
+        "200":
+          description: Resposta gerada pelo modelo, cache, fallback resiliente ou recusa fora de escopo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsultoriaOut"
+  /v1/ia/comparar-rag:
+    post:
+      summary: Executa a mesma pergunta com e sem recuperação vetorial RAG para análise comparativa
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ComparacaoRagIn"
+      responses:
+        "200":
+          description: Comparativo lado a lado (com_rag e sem_rag), chunks recuperados e latências
+  /v1/ia/metricas:
+    get:
+      summary: Telemetria de latência, hits/misses de cache, retries, fallbacks e estimativa de custo
+      responses:
+        "200":
+          description: Relatório consolidado de telemetria distribuída
+  /v1/ia/circuit-breaker:
+    post:
+      summary: Controla manualmente o Circuit Breaker e o cache de respostas para testes
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CircuitBreakerIn"
+      responses:
+        "200":
+          description: Novo estado do Circuit Breaker e contadores de cache
+  /v1/ia/diagnostico/perguntas-dinamicas:
+    post:
+      summary: Gera perguntas dinâmicas personalizadas para o diagnóstico híbrido da ONG
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PerguntasDinamicasIn"
+      responses:
+        "200":
+          description: Perguntas em contrato estruturado (via LLM ou fallback contextualizado)
+  /v1/ia/plano-acao/personalizar:
+    post:
+      summary: Personaliza tarefas corretivas do Plano de Ação com base no perfil da ONG e respostas NAO
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlanoAcaoPersonalizarIn"
+      responses:
+        "200":
+          description: Lista de tarefas personalizadas (título e prazo em dias)
+
+components:
+  schemas:
+    ConsultoriaIn:
+      type: object
+      required: [pergunta]
+      properties:
+        ong_id:
+          type: string
+          default: ong-123
+        pergunta:
+          type: string
+        usar_rag:
+          type: boolean
+          default: true
+        usar_cache:
+          type: boolean
+          default: true
+        simular_falha_llm:
+          type: boolean
+          default: false
+    ConsultoriaOut:
+      type: object
+      properties:
+        ong_id:
+          type: string
+        pergunta:
+          type: string
+        usar_rag:
+          type: boolean
+        modelo:
+          type: string
+        resposta:
+          type: string
+        modo_operacao:
+          type: string
+          enum: [OLLAMA_DEEPHAT, CACHE_HIT, FALLBACK_RESILIENTE, FORA_DO_ESCOPO]
+        cache_hit:
+          type: boolean
+        retries:
+          type: integer
+        latencia_ms:
+          type: number
+        circuit_breaker:
+          type: object
+        rag_fontes:
+          type: array
+          items:
+            type: object
+        dados_tools:
+          type: object
+    ComparacaoRagIn:
+      type: object
+      required: [pergunta]
+      properties:
+        ong_id:
+          type: string
+          default: ong-123
+        pergunta:
+          type: string
+    CircuitBreakerIn:
+      type: object
+      required: [acao]
+      properties:
+        acao:
+          type: string
+          enum: [abrir, fechar, limpar_cache]
+    PerguntasDinamicasIn:
+      type: object
+      properties:
+        ong_id:
+          type: string
+          nullable: true
+        nome_instituicao:
+          type: string
+          nullable: true
+        descricao_atividades:
+          type: string
+          default: ""
+        publico_atendido:
+          type: array
+          items:
+            type: string
+        canais_coleta_dados:
+          type: array
+          items:
+            type: string
+        quantidade:
+          type: integer
+          default: 5
+        simular_falha_llm:
+          type: boolean
+          default: false
+    PlanoAcaoPersonalizarIn:
+      type: object
+      properties:
+        ong_id:
+          type: string
+          default: ong-123
+        perfil_ong:
+          type: object
+        nao_conformes:
+          type: array
+          items:
+            type: object
+        score:
+          type: integer
+          default: 0
+        simular_falha_llm:
+          type: boolean
+          default: false
+

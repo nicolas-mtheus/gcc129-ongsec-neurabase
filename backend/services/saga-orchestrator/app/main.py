@@ -249,16 +249,8 @@ def iniciar_saga(
             s.commit()
             return _solicitacao_json(sol)
     except Exception:
-        # Compensação em ordem inversa:
-        # 1) Revogar selo ativo existente na ONG (se houver) para refletir no CQRS público
-        try:
-            st_cert, cert = _chamar("GET", f"{BADGE_URL}/v1/organizacoes/{corpo.ong_id}/certificacao", x_correlation_id)
-            if st_cert == 200 and cert and cert.get("status_conformidade") == "ATIVO" and cert.get("id_selo"):
-                _chamar("POST", f"{BADGE_URL}/v1/selos/{cert['id_selo']}/revogacao", x_correlation_id)
-        except RuntimeError:
-            pass
-
-        # 2) Reabrir plano de tarefas no task-service (audit-service permanece intacto: fato histórico)
+        # Compensação em ordem inversa (nesta falha, o selo nunca foi emitido):
+        # 1) Reabrir plano de tarefas no task-service (audit-service permanece intacto: fato histórico)
         reabriu = False
         try:
             st_reab, _ = _chamar("POST", f"{TASK_URL}/v1/planos/{plano_id}/reabertura", x_correlation_id)
@@ -266,7 +258,7 @@ def iniciar_saga(
         except RuntimeError:
             pass
 
-        # 3) Registrar falha e compensação na SAGA
+        # 2) Registrar falha e compensação na SAGA
         with Session(engine) as s:
             sol = s.get(SolicitacaoSaga, sol_id)
             sol.estado = "COMPENSADA"

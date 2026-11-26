@@ -99,3 +99,68 @@ No domínio, o HATEOAS está em dois recursos:
 - `GET /v1/solicitacoes/sol-998` no `saga-orchestrator`, com `self`, `consulta_publica`, `certificacao` e `revogar`
 
 `revogar.href` na solicitação (`/v1/selos/CERT-2026-998/revogacao`, método `POST`) é o que o BFF publica como `revogar_selo`. O identificador do caminho externo é `ong-123` porque o cliente do painel conhece a ONG, não o id interno do selo. O BFF faz essa tradução.
+
+---
+
+## Endpoints de IA no BFF Gestão (`/api/gestao/ia/*`)
+
+O BFF Gestão expõe as funcionalidades do [`ai-service`](../openapi/ai-service.yaml) sob o prefixo autenticado `/api/gestao/ia/*` com controle de acesso por perfil (`GESTOR` vs `ADMIN`):
+
+| Rota externa no Gateway/BFF | Método | Perfil exigido | Chamada interna (`ai-service`) | Observação |
+|---|---|---|---|---|
+| `/api/gestao/ia/consultoria` | `POST` | `GESTOR` ou `ADMIN` (dono da ONG) | `POST /v1/ia/consultoria` | Valida escopo LGPD/segurança (`FORA_DO_ESCOPO`). Apenas `ADMIN` pode enviar `simular_falha_llm: true` (`403` para `GESTOR`). |
+| `/api/gestao/ia/comparar-rag` | `POST` | `ADMIN` (`403` para `GESTOR`) | `POST /v1/ia/comparar-rag` | Executa a pergunta com e sem recuperação RAG para demonstração e análise técnica. |
+| `/api/gestao/ia/metricas` | `GET` | `ADMIN` (`403` para `GESTOR`) | `GET /v1/ia/metricas` | Retorna latências medidas, cache hits/misses, retries, fallbacks e estimativa de custo. |
+| `/api/gestao/ia/circuit-breaker` | `POST` | `ADMIN` (`403` para `GESTOR`) | `POST /v1/ia/circuit-breaker` | Controla estado do Circuit Breaker (`abrir`, `fechar`) ou limpa o cache (`limpar_cache`). |
+
+Além das rotas explícitas `/api/gestao/ia/*`, os fluxos de diagnóstico e plano de ação do BFF consomem internamente o `ai-service`:
+
+- `POST /api/gestao/{ong_id}/diagnosticos/gerar-hibrido` → chama `POST /v1/ia/diagnostico/perguntas-dinamicas` para gerar 5 perguntas dinâmicas personalizadas pelo perfil da ONG.
+- `POST /api/gestao/{ong_id}/diagnosticos/responder` → chama `POST /v1/ia/plano-acao/personalizar` para adaptar as ações corretivas de itens marcados como `NAO` à realidade da instituição.
+
+### Exemplos de Contrato (`/api/gestao/ia/*`)
+
+**`POST /api/gestao/ia/consultoria`**
+
+```json
+// Request
+{
+  "ong_id": "ong-123",
+  "pergunta": "Segundo a Resolução CD/ANPD nº 2/2022, nossa ONG precisa de DPO formal?",
+  "usar_rag": true,
+  "usar_cache": true,
+  "simular_falha_llm": false
+}
+```
+
+```json
+// Response (200 OK)
+{
+  "ong_id": "ong-123",
+  "pergunta": "Segundo a Resolução CD/ANPD nº 2/2022, nossa ONG precisa de DPO formal?",
+  "usar_rag": true,
+  "modelo": "deephat:latest",
+  "resposta": "...",
+  "modo_operacao": "OLLAMA_DEEPHAT",
+  "cache_hit": false,
+  "retries": 0,
+  "latencia_ms": 3420.5,
+  "circuit_breaker": { "estado": "CLOSED", "falhas_consecutivas": 0 },
+  "rag_fontes": [],
+  "dados_tools": {}
+}
+```
+
+**`POST /api/gestao/ia/circuit-breaker`** (`ADMIN`)
+
+```json
+// Request
+{ "acao": "abrir" }
+
+// Response (200 OK)
+{
+  "acao_executada": "abrir",
+  "circuit_breaker": { "estado": "OPEN", "falhas_consecutivas": 0, "forcado_aberto": true },
+  "cache": { "hits": 1, "misses": 2 }
+}
+```

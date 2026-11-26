@@ -29,7 +29,7 @@ Se o plano ainda tiver tarefa pendente ou o diagnóstico não tiver score, o `PO
 
 | Ordem | Serviço | O que o orquestrador faz | Sucesso | Evento no histórico |
 |---|---|---|---|---|
-| 1 | badge-service | `POST /v1/solicitacoes` | Solicitação `SOLICITADA`, HTTP `202` | — |
+| 1 | saga-orchestrator | `POST /v1/solicitacoes` | Solicitação `SOLICITADA`, HTTP `202` | — |
 | 2 | audit-service | `GET /v1/diagnosticos/diag-55` | Status `CONCLUIDO` e `score` preenchido | `DIAGNOSTICO_CONCLUIDO` |
 | 3 | task-service | `GET /v1/organizacoes/ong-123/plano-atual` | `tarefas_pendentes = 0` e `plano_id` igual ao informado | `TAREFAS_REMEDIADAS` |
 | 4 | badge-service | grava o selo `ATIVO` na mesma transação da *outbox* | Solicitação `SELO_EMITIDO`, `id_selo = CERT-2026-998` | `SELO_GERADO` |

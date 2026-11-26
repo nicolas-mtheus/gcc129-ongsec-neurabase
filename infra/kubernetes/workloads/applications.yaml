@@ -56,6 +56,11 @@ spec:
                 secretKeyRef:
                   name: ongsec-app-credentials
                   key: JWT_SECRET
+            - name: REDIS_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: ongsec-app-config
+                  key: REDIS_URL
           readinessProbe:
             httpGet:
               path: /healthz
@@ -141,6 +146,16 @@ spec:
                 secretKeyRef:
                   name: audit-db-credentials
                   key: DB_PASSWORD
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: ongsec-app-credentials
+                  key: JWT_SECRET
+            - name: JWT_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ongsec-app-credentials
+                  key: JWT_SECRET
           readinessProbe:
             httpGet:
               path: /healthz
@@ -315,6 +330,11 @@ spec:
                   key: DB_PASSWORD
             - name: DATABASE_URL
               value: "postgresql+psycopg2://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)"
+            - name: REDIS_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: ongsec-app-config
+                  key: REDIS_URL
           readinessProbe:
             httpGet:
               path: /healthz
@@ -405,6 +425,16 @@ spec:
                 configMapKeyRef:
                   name: ongsec-app-config
                   key: AI_SERVICE_URL
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: ongsec-app-credentials
+                  key: JWT_SECRET
+            - name: JWT_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ongsec-app-credentials
+                  key: JWT_SECRET
           readinessProbe:
             httpGet:
               path: /healthz
@@ -600,6 +630,11 @@ spec:
                 secretKeyRef:
                   name: ongsec-app-credentials
                   key: JWT_SECRET
+            - name: REDIS_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: ongsec-app-config
+                  key: REDIS_URL
           readinessProbe:
             httpGet:
               path: /healthz

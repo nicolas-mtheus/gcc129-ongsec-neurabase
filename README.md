@@ -104,7 +104,7 @@ O sistema utiliza o padrão de **Microsserviços com Database per Service** (cad
 - **BFF Público (`bff-publico`):** Porta interna 8000. Consulta anônima de selos via CQRS otimizado para cidadãos e doadores.
 
 ### 💾 3. Persistência e Isolamento de Redes (Compose)
-- **4 Volumes Nomeados:** `org-data`, `audit-data`, `task-data` e `badge-data`, assegurando persistência durável dos bancos PostgreSQL 16.
+- **5 Volumes Nomeados:** `org-data`, `audit-data`, `task-data`, `badge-data` e `saga-data`, assegurando persistência durável dos bancos PostgreSQL 16.
 - **6 Redes Definidas com Isolamento Estrito:**
   - `edge-network`: Conecta Gateway aos BFFs e Frontend Web.
   - `app-network`: Conecta BFFs aos microsserviços de domínio.

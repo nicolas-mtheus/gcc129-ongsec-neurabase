@@ -84,7 +84,7 @@ O **ONGSec** atua como um consultor de segurança automatizado e emissor de selo
 
 O sistema utiliza o padrão de **Microsserviços com Database per Service** (cada serviço possui sua própria instância isolada de banco de dados). O tráfego externo entra sempre pelo API Gateway antes de alcançar o BFF correspondente.
 
-![ONGSec - Arquitetura geral: dois clientes, API Gateway, dois BFFs, orquestrador SAGA dedicado, quatro servicos e bancos isolados](docs/img/arquitetura-geral.png)
+![ONGSec - Arquitetura geral: dois clientes, API Gateway, dois BFFs, orquestrador SAGA dedicado, quatro servicos e bancos isolados](docs/img/arquitetura-geral-final.png)
 
 ### 🐳 1. Docker e Dockerfiles Customizados
 - **Dockerfile próprio para cada serviço:** Nenhum serviço utiliza imagens prontas de terceiros sem customização.

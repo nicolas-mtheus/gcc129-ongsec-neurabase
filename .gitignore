@@ -5,3 +5,4 @@ __pycache__/
 .venv/
 stub_local.py
 docker-compose.teste.yml
+info/

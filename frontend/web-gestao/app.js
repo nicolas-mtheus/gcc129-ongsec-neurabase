@@ -157,6 +157,12 @@ document.getElementById('btnFillDemo')?.addEventListener('click', () => {
   showToast('Credenciais demo preenchidas!', 'info');
 });
 
+document.getElementById('btnFillAdmin')?.addEventListener('click', () => {
+  document.getElementById('email').value = 'admin@gmail.com';
+  document.getElementById('senha').value = 'admin123';
+  showToast('Credenciais de admin preenchidas. Essa conta abre a aba Debug IA.', 'info');
+});
+
 async function login(e) {
   if (e) e.preventDefault();
   const email = document.getElementById('email').value.trim();
